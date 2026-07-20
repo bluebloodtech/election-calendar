@@ -5,7 +5,7 @@
 create table if not exists archive_entries (
   id uuid primary key default gen_random_uuid(),
   day date not null,
-  place text not null check (place in ('first', 'second_third')),
+  place text not null check (place in ('first', 'second', 'third')),
   image_url text not null,
   created_at timestamptz not null default now(),
   unique (day, place)
@@ -23,3 +23,14 @@ alter table archive_entries enable row level security;
 -- <Image> thumbnails without needing signed URLs. If the Kalshi screenshots
 -- should NOT be publicly reachable by anyone with the link, tell me instead
 -- and I'll switch the app to use short-lived signed URLs.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRATION (run this if the table already exists with the old constraint):
+-- ─────────────────────────────────────────────────────────────────────────────
+-- alter table archive_entries
+--   drop constraint if exists archive_entries_place_check;
+--
+-- alter table archive_entries
+--   add constraint archive_entries_place_check
+--   check (place in ('first', 'second', 'third'));
+

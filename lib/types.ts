@@ -1,4 +1,4 @@
-export type Place = "first" | "second_third";
+export type Place = "first" | "second" | "third";
 
 export interface ArchiveEntry {
   day: string; // "YYYY-MM-DD"

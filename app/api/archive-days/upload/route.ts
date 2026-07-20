@@ -25,9 +25,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (place !== "first" && place !== "second_third") {
+  if (place !== "first" && place !== "second" && place !== "third") {
     return NextResponse.json(
-      { error: "Missing or invalid 'place' (expected 'first' or 'second_third')." },
+      { error: "Missing or invalid 'place' (expected 'first', 'second', or 'third')." },
       { status: 400 }
     );
   }
