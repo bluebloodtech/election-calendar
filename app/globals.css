@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0a0e13;
+  --panel: #11161d;
+  --panel-raised: #161d26;
+  --line: #232c37;
+  --line-bright: #3a4552;
+  --text: #e9edf2;
+  --text-muted: #7c8794;
+  --gold: #d4a537;
+  --gold-dim: #8a6f2c;
+  --streak: #3fae6a;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-panel-raised: var(--panel-raised);
+  --color-line: var(--line);
+  --color-line-bright: var(--line-bright);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-gold: var(--gold);
+  --color-gold-dim: var(--gold-dim);
+  --color-streak: var(--streak);
+  --font-display: var(--font-oswald);
+  --font-mono: var(--font-plex-mono);
+  --font-sans: var(--font-inter);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-sans);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
