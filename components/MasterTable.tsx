@@ -17,6 +17,10 @@ export function MasterTable() {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
+  // Suggested names pulled from the Zoho-backed candidate list the Election
+  // Intelligence Map already tracks — lets the client add a race in one
+  // click instead of retyping a name that's already tracked elsewhere.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount pattern
@@ -32,18 +36,24 @@ export function MasterTable() {
         setLoading(false);
       }
     })();
+
+    // Best-effort — if this fails, the add form still works via typing.
+    fetch("/api/candidates")
+      .then((res) => res.json())
+      .then((json) => setSuggestions(json.candidates ?? []))
+      .catch(() => {});
   }, []);
 
-  const handleAdd = useCallback(async () => {
-    const name = newName.trim();
-    if (!name) return;
+  const handleAdd = useCallback(async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
     setAdding(true);
     setError(null);
     try {
       const res = await fetch("/api/elections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: trimmed }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to add election.");
@@ -55,7 +65,14 @@ export function MasterTable() {
     } finally {
       setAdding(false);
     }
-  }, [newName]);
+  }, []);
+
+  // Suggestions already added shouldn't be offered again.
+  const trackedNames = useMemo(
+    () => new Set(elections.map((e) => e.name)),
+    [elections]
+  );
+  const availableSuggestions = suggestions.filter((s) => !trackedNames.has(s));
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -87,28 +104,51 @@ export function MasterTable() {
       </header>
 
       {showAddForm && (
-        <form
-          className="mb-4 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleAdd();
-          }}
-        >
-          <input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Market name, e.g. US Senate Race - AZ"
-            className="focus-ring flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
-          />
-          <button
-            type="submit"
-            disabled={adding || !newName.trim()}
-            className="focus-ring rounded bg-gold px-4 py-2 font-display text-sm uppercase tracking-wide text-ink disabled:opacity-50"
+        <div className="mb-4">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAdd(newName);
+            }}
           >
-            {adding ? "Adding…" : "Add"}
-          </button>
-        </form>
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Market name, e.g. US Senate Race - AZ"
+              className="focus-ring flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
+            />
+            <button
+              type="submit"
+              disabled={adding || !newName.trim()}
+              className="focus-ring rounded bg-gold px-4 py-2 font-display text-sm uppercase tracking-wide text-ink disabled:opacity-50"
+            >
+              {adding ? "Adding…" : "Add"}
+            </button>
+          </form>
+
+          {availableSuggestions.length > 0 && (
+            <div className="mt-2">
+              <p className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">
+                Or add a tracked candidate from the map:
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {availableSuggestions.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    disabled={adding}
+                    onClick={() => handleAdd(name)}
+                    className="focus-ring rounded-full border border-line px-3 py-1 text-xs text-text-muted hover:border-gold-dim hover:text-gold disabled:opacity-50"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -132,7 +172,7 @@ export function MasterTable() {
       <div className="overflow-x-auto rounded-md border border-line bg-panel">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-line font-display text-xs uppercase tracking-widest text-text-muted">
+            <tr className="border-b border-line text-center font-display text-xs uppercase tracking-widest text-text-muted">
               <th className="px-4 py-3">Market Name</th>
               <th className="px-4 py-3">Leader (1st)</th>
               <th className="px-4 py-3">Price</th>
@@ -169,10 +209,10 @@ export function MasterTable() {
                   </span>
                   {e.name}
                 </td>
-                <td className="px-4 py-3 text-gold">{e.leader || "—"}</td>
-                <td className="px-4 py-3 font-mono">{e.price || "—"}</td>
-                <td className="px-4 py-3 font-mono">{e.volume || "—"}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-center text-gold">{e.leader || "—"}</td>
+                <td className="px-4 py-3 text-center font-mono">{e.price || "—"}</td>
+                <td className="px-4 py-3 text-center font-mono">{e.volume || "—"}</td>
+                <td className="px-4 py-3 text-center">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
                       e.status === "Active"
@@ -183,8 +223,8 @@ export function MasterTable() {
                     {e.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                <td className="px-4 py-3 text-center">
+                  <div className="flex justify-center gap-2">
                     <Link
                       href={`/election/${e.id}`}
                       className="focus-ring rounded border border-line px-3 py-1 font-display text-xs uppercase tracking-wide text-text-muted hover:border-gold-dim hover:text-gold"
