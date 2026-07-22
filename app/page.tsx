@@ -10,6 +10,9 @@ export default function Home() {
         <p className="mt-1 text-sm text-text-muted">
           Daily Kalshi screenshot archive — drop a screenshot on any day to file it.
         </p>
+        <p className="mt-1 text-xs text-text-muted/60">
+          test deploy {new Date().toISOString().slice(0, 10)}
+        </p>
       </div>
       <CalendarGrid />
     </main>
