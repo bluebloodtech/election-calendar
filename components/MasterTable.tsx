@@ -7,7 +7,14 @@ import { MAX_ELECTIONS, type Election } from "@/lib/types";
 // Main marketing site's Election Intelligence Map (Ghost theme, routes.yaml
 // maps "/map/" -> custom-election-map). Kept as one shared page rather than
 // building a second map per election, per the client's direction.
-const MAP_URL = "https://electionnightclub.com/map/";
+//
+// The ?candidate= param only does something once the matching snippet is
+// pasted into partials/custom-election-map.hbs on the theme side (this repo
+// can't deploy that site) — see the map-deep-link note in the README.
+// Until then it's a harmless no-op query param.
+function mapUrlFor(electionName: string) {
+  return `https://electionnightclub.com/map/?candidate=${encodeURIComponent(electionName)}`;
+}
 
 export function MasterTable() {
   const [elections, setElections] = useState<Election[]>([]);
@@ -220,7 +227,7 @@ export function MasterTable() {
                         out to it in a new tab instead of duplicating it
                         here, per the client's instruction to reuse it. */}
                     <a
-                      href={MAP_URL}
+                      href={mapUrlFor(e.name)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="focus-ring rounded border border-line px-3 py-1 font-display text-xs uppercase tracking-wide text-text-muted hover:border-steel-dim hover:text-steel"

@@ -4,7 +4,9 @@ A small Next.js app with three jobs:
 
 1. **Master Command Center** (`/`) — a table of every tracked election market (max 15), with search/filter and links out to that market's calendar and map.
 2. **Per-election Calendar** (`/election/[id]`) — an Apple-Calendar-style monthly grid. Drop a Kalshi screenshot on any day to archive it; toggle between 1st Place and 2nd/3rd Place standings.
-3. **Map** — reuses the existing Election Intelligence Map already built into the main Ghost site at `electionnightclub.com/map/`. This app does not host its own map; the "View Map" button just links out to it.
+3. **Map** — reuses the existing Election Intelligence Map already built into the main Ghost site at `electionnightclub.com/map/`. This app does not host its own map; the "View Map" button links out to it with a `?candidate=<name>` param.
+
+**Map deep-linking is half-done.** The `?candidate=` param this app sends only does something once a small snippet is pasted into `partials/custom-election-map.hbs` on the *theme* repo (not this one — this app has no deploy access there). Until that snippet is added, "View Map" opens the map fine, it just doesn't auto-select the candidate. The exact snippet and insertion point were given to the client directly (not stored in this repo, since it doesn't belong to this codebase).
 
 No custom backend framework, no message queue, no auth system — just Next.js API routes talking directly to Supabase. That's a deliberate choice: it's the smallest stack that does the job, and any Next.js/React developer can pick it up without learning project-specific tooling.
 
