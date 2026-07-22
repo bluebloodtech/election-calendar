@@ -17,10 +17,7 @@ export function MasterTable() {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
-  // Suggested names pulled from the Zoho-backed candidate list the Election
-  // Intelligence Map already tracks — lets the client add a race in one
-  // click instead of retyping a name that's already tracked elsewhere.
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount pattern
@@ -36,24 +33,19 @@ export function MasterTable() {
         setLoading(false);
       }
     })();
-
-    // Best-effort — if this fails, the add form still works via typing.
-    fetch("/api/candidates")
-      .then((res) => res.json())
-      .then((json) => setSuggestions(json.candidates ?? []))
-      .catch(() => {});
   }, []);
 
-  const handleAdd = useCallback(async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
+  // Manual add only — no auto-import from any external source, by design.
+  const handleAdd = useCallback(async () => {
+    const name = newName.trim();
+    if (!name) return;
     setAdding(true);
     setError(null);
     try {
       const res = await fetch("/api/elections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({ name }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to add election.");
@@ -65,14 +57,29 @@ export function MasterTable() {
     } finally {
       setAdding(false);
     }
-  }, []);
+  }, [newName]);
 
-  // Suggestions already added shouldn't be offered again.
-  const trackedNames = useMemo(
-    () => new Set(elections.map((e) => e.name)),
-    [elections]
-  );
-  const availableSuggestions = suggestions.filter((s) => !trackedNames.has(s));
+  const handleDelete = useCallback(async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This also removes its calendar screenshots.`)) {
+      return;
+    }
+    setDeletingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/elections", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to delete election.");
+      setElections((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete election.");
+    } finally {
+      setDeletingId(null);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -104,51 +111,28 @@ export function MasterTable() {
       </header>
 
       {showAddForm && (
-        <div className="mb-4">
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleAdd(newName);
-            }}
+        <form
+          className="mb-4 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAdd();
+          }}
+        >
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Market name, e.g. US Senate Race - AZ"
+            className="focus-ring flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
+          />
+          <button
+            type="submit"
+            disabled={adding || !newName.trim()}
+            className="focus-ring rounded bg-gold px-4 py-2 font-display text-sm uppercase tracking-wide text-ink disabled:opacity-50"
           >
-            <input
-              autoFocus
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Market name, e.g. US Senate Race - AZ"
-              className="focus-ring flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
-            />
-            <button
-              type="submit"
-              disabled={adding || !newName.trim()}
-              className="focus-ring rounded bg-gold px-4 py-2 font-display text-sm uppercase tracking-wide text-ink disabled:opacity-50"
-            >
-              {adding ? "Adding…" : "Add"}
-            </button>
-          </form>
-
-          {availableSuggestions.length > 0 && (
-            <div className="mt-2">
-              <p className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">
-                Or add a tracked candidate from the map:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {availableSuggestions.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    disabled={adding}
-                    onClick={() => handleAdd(name)}
-                    className="focus-ring rounded-full border border-line px-3 py-1 text-xs text-text-muted hover:border-gold-dim hover:text-gold disabled:opacity-50"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+            {adding ? "Adding…" : "Add"}
+          </button>
+        </form>
       )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -243,6 +227,15 @@ export function MasterTable() {
                     >
                       View Map
                     </a>
+                    <button
+                      type="button"
+                      disabled={deletingId === e.id}
+                      onClick={() => handleDelete(e.id, e.name)}
+                      title="Delete this election"
+                      className="focus-ring rounded border border-line px-2 py-1 text-xs text-text-muted hover:border-red-800 hover:text-red-400 disabled:opacity-50"
+                    >
+                      {deletingId === e.id ? "…" : "×"}
+                    </button>
                   </div>
                 </td>
               </tr>
