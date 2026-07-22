@@ -23,3 +23,4 @@ export function getSupabaseServerClient() {
 
 export const ARCHIVE_BUCKET = "kalshi-screenshots";
 export const ARCHIVE_TABLE = "archive_entries";
+export const ELECTIONS_TABLE = "elections";

@@ -6,11 +6,14 @@ import {
 } from "@/lib/supabase-server";
 
 // DELETE /api/archive-days/delete
-// JSON body: { day: "YYYY-MM-DD", place: "first" | "second_third" }
+// JSON body: { election: uuid, day: "YYYY-MM-DD", place: "first" | "second" | "third" }
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  const { day, place } = body ?? {};
+  const { election, day, place } = body ?? {};
 
+  if (typeof election !== "string" || !election) {
+    return NextResponse.json({ error: "Missing 'election'." }, { status: 400 });
+  }
   if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
     return NextResponse.json(
       { error: "Missing or invalid 'day' (expected YYYY-MM-DD)." },
@@ -26,11 +29,11 @@ export async function DELETE(req: NextRequest) {
 
   const supabase = getSupabaseServerClient();
 
-  // List all files under day/place-* prefix and remove them from Storage
-  const prefix = `${day}/${place}-`;
+  // Remove stored screenshots under <election>/<day>/<place>-*
+  const folder = `${election}/${day}`;
   const { data: files, error: listError } = await supabase.storage
     .from(ARCHIVE_BUCKET)
-    .list(day);
+    .list(folder);
 
   if (listError) {
     return NextResponse.json({ error: listError.message }, { status: 500 });
@@ -38,7 +41,7 @@ export async function DELETE(req: NextRequest) {
 
   const toRemove = (files ?? [])
     .filter((f) => f.name.startsWith(`${place}-`))
-    .map((f) => `${day}/${f.name}`);
+    .map((f) => `${folder}/${f.name}`);
 
   if (toRemove.length > 0) {
     const { error: removeError } = await supabase.storage
@@ -50,10 +53,10 @@ export async function DELETE(req: NextRequest) {
     }
   }
 
-  // Delete the database record
   const { error: dbError } = await supabase
     .from(ARCHIVE_TABLE)
     .delete()
+    .eq("election_id", election)
     .eq("day", day)
     .eq("place", place);
 

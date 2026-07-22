@@ -2,14 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient, ARCHIVE_TABLE } from "@/lib/supabase-server";
 import type { ArchiveEntry } from "@/lib/types";
 
-// GET /api/archive-days?month=2026-07
-// Returns all archive entries (both places) for the given month.
+// GET /api/archive-days?election=<uuid>&month=2026-07
+// Returns all archive entries (all places) for one election in the given month.
 export async function GET(req: NextRequest) {
   const month = req.nextUrl.searchParams.get("month"); // "YYYY-MM"
+  const election = req.nextUrl.searchParams.get("election");
 
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
     return NextResponse.json(
       { error: "Query param 'month' is required in YYYY-MM format." },
+      { status: 400 }
+    );
+  }
+  if (!election) {
+    return NextResponse.json(
+      { error: "Query param 'election' is required." },
       { status: 400 }
     );
   }
@@ -22,7 +29,8 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from(ARCHIVE_TABLE)
-    .select("day, place, image_url, created_at")
+    .select("day, place, image_url, created_at, leader, price, volume")
+    .eq("election_id", election)
     .gte("day", rangeStart)
     .lte("day", rangeEnd)
     .order("day", { ascending: true });

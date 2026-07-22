@@ -1,4 +1,4 @@
-import { CalendarGrid } from "@/components/CalendarGrid";
+import { MasterTable } from "@/components/MasterTable";
 
 export default function Home() {
   return (
@@ -8,10 +8,10 @@ export default function Home() {
           Election Nightclub
         </p>
         <p className="mt-1 text-sm text-text-muted">
-          Daily Kalshi screenshot archive — drop a screenshot on any day to file it.
+          Master command center — every tracked market at a glance.
         </p>
       </div>
-      <CalendarGrid />
+      <MasterTable />
     </main>
   );
 }

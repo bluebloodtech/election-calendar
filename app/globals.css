@@ -10,6 +10,8 @@
   --text-muted: #7c8794;
   --gold: #d4a537;
   --gold-dim: #8a6f2c;
+  --steel: #5b8fc9;
+  --steel-dim: #3a5d85;
   --streak: #3fae6a;
 }
 
@@ -23,6 +25,8 @@
   --color-text-muted: var(--text-muted);
   --color-gold: var(--gold);
   --color-gold-dim: var(--gold-dim);
+  --color-steel: var(--steel);
+  --color-steel-dim: var(--steel-dim);
   --color-streak: var(--streak);
   --font-display: var(--font-oswald);
   --font-mono: var(--font-plex-mono);
@@ -65,4 +69,35 @@ body {
 .focus-ring:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
+}
+
+/*
+ * Apple-Calendar-style theme, scoped to the per-election calendar page only.
+ * Overriding the raw --ink/--panel/... tokens (not the Tailwind --color-*
+ * aliases) is enough: --color-ink is defined once as "var(--ink)", and that
+ * nested var() re-resolves against whichever --ink is nearest in the DOM —
+ * so every existing bg-ink/text-text/etc. utility class "just works" here
+ * without touching CalendarGrid.tsx or DayCell.tsx.
+ */
+.apple-calendar {
+  color-scheme: light;
+  --ink: #ffffff;
+  --panel: #ffffff;
+  --panel-raised: #f5f5f7;
+  --line: #e5e5ea;
+  --line-bright: #d1d1d6;
+  --text: #1c1c1e;
+  --text-muted: #8e8e93;
+  --gold: #b8860b;
+  --gold-dim: #d4a537;
+  --steel: #3b82f6;
+  --steel-dim: #93c5fd;
+  --streak: #34c759;
+  background: var(--ink);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  min-height: 100%;
 }

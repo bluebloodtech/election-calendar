@@ -11,7 +11,7 @@ function toISODate(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export function CalendarGrid() {
+export function CalendarGrid({ electionId }: { electionId: string }) {
   const today = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
@@ -30,7 +30,9 @@ export function CalendarGrid() {
     setLoadError(null);
     const monthParam = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
     try {
-      const res = await fetch(`/api/archive-days?month=${monthParam}`);
+      const res = await fetch(
+        `/api/archive-days?election=${electionId}&month=${monthParam}`
+      );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load archive.");
       const map: Record<string, ArchiveEntry> = {};
@@ -43,7 +45,7 @@ export function CalendarGrid() {
     } finally {
       setLoading(false);
     }
-  }, [viewYear, viewMonth]);
+  }, [viewYear, viewMonth, electionId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount/param-change pattern
@@ -51,7 +53,12 @@ export function CalendarGrid() {
   }, [loadMonth]);
 
   const handleUploaded = useCallback(
-    (dateISO: string, uploadedPlace: Place, imageUrl: string) => {
+    (
+      dateISO: string,
+      uploadedPlace: Place,
+      imageUrl: string,
+      extracted: { leader: string; price: string; volume: string }
+    ) => {
       setEntries((prev) => ({
         ...prev,
         [`${dateISO}__${uploadedPlace}`]: {
@@ -59,6 +66,9 @@ export function CalendarGrid() {
           place: uploadedPlace,
           image_url: imageUrl,
           created_at: new Date().toISOString(),
+          leader: extracted.leader,
+          price: extracted.price,
+          volume: extracted.volume,
         },
       }));
     },
@@ -164,10 +174,11 @@ export function CalendarGrid() {
         {cells.map((cell) => (
           <DayCell
             key={cell.dateISO}
+            electionId={electionId}
             dateISO={cell.dateISO}
             dayNumber={cell.dayNumber}
             place={place}
-            imageUrl={entries[`${cell.dateISO}__${place}`]?.image_url}
+            entry={entries[`${cell.dateISO}__${place}`]}
             isToday={cell.dateISO === todayISO}
             isCurrentMonth={cell.inMonth}
             onUploaded={handleUploaded}

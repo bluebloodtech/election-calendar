@@ -30,7 +30,9 @@ export function PlaceToggle({
           onClick={() => onChange(opt.value)}
           className={`focus-ring rounded-full px-4 py-1.5 transition-colors ${
             value === opt.value
-              ? "bg-gold text-ink"
+              ? opt.value === "first"
+                ? "bg-gold text-ink"
+                : "bg-steel text-ink"
               : "text-text-muted hover:text-text"
           }`}
         >

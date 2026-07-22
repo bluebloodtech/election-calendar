@@ -2,24 +2,31 @@
 
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
-import type { Place } from "@/lib/types";
+import type { ArchiveEntry, Place } from "@/lib/types";
 
 interface DayCellProps {
+  electionId: string;
   dateISO: string; // "YYYY-MM-DD"
   dayNumber: number;
   place: Place;
-  imageUrl?: string;
+  entry?: ArchiveEntry;
   isToday: boolean;
   isCurrentMonth: boolean;
-  onUploaded: (dateISO: string, place: Place, imageUrl: string) => void;
+  onUploaded: (
+    dateISO: string,
+    place: Place,
+    imageUrl: string,
+    extracted: { leader: string; price: string; volume: string }
+  ) => void;
   onDeleted: (dateISO: string, place: Place) => void;
 }
 
 export function DayCell({
+  electionId,
   dateISO,
   dayNumber,
   place,
-  imageUrl,
+  entry,
   isToday,
   isCurrentMonth,
   onUploaded,
@@ -31,6 +38,12 @@ export function DayCell({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Spec color coding: gold = 1st place standings, steel blue = 2nd/3rd.
+  const isFirst = place === "first";
+  const filledBorder = isFirst ? "border-gold-dim" : "border-steel-dim";
+  const accentText = isFirst ? "text-gold" : "text-steel";
+  const imageUrl = entry?.image_url;
+
   const doUpload = useCallback(
     async (file: File) => {
       setErrorMsg(null);
@@ -38,6 +51,7 @@ export function DayCell({
       try {
         const body = new FormData();
         body.append("file", file);
+        body.append("election", electionId);
         body.append("day", dateISO);
         body.append("place", place);
 
@@ -50,14 +64,18 @@ export function DayCell({
         if (!res.ok) {
           throw new Error(json.error || "Upload failed.");
         }
-        onUploaded(dateISO, place, json.image_url);
+        onUploaded(dateISO, place, json.image_url, {
+          leader: json.leader ?? "",
+          price: json.price ?? "",
+          volume: json.volume ?? "",
+        });
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "Upload failed.");
       } finally {
         setIsUploading(false);
       }
     },
-    [dateISO, place, onUploaded]
+    [electionId, dateISO, place, onUploaded]
   );
 
   const doDelete = useCallback(
@@ -69,7 +87,7 @@ export function DayCell({
         const res = await fetch("/api/archive-days/delete", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ day: dateISO, place }),
+          body: JSON.stringify({ election: electionId, day: dateISO, place }),
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Delete failed.");
@@ -80,7 +98,7 @@ export function DayCell({
         setIsDeleting(false);
       }
     },
-    [dateISO, place, onDeleted]
+    [electionId, dateISO, place, onDeleted]
   );
 
   const handleDrop = useCallback(
@@ -98,7 +116,9 @@ export function DayCell({
       className={`focus-ring group relative flex aspect-square flex-col overflow-hidden rounded-md border transition-colors ${
         isDragging
           ? "border-gold bg-panel-raised"
-          : "border-line bg-panel hover:border-line-bright"
+          : imageUrl
+            ? `${filledBorder} bg-panel`
+            : "border-line bg-panel hover:border-line-bright"
       } ${!isCurrentMonth ? "opacity-40" : ""}`}
       onDragOver={(e) => {
         e.preventDefault();
@@ -115,6 +135,13 @@ export function DayCell({
         >
           {String(dayNumber).padStart(2, "0")}
         </span>
+        {entry && (entry.price || entry.volume) && (
+          <span className={`truncate pl-1 font-mono text-[9px] ${accentText}`}>
+            {entry.price && `${isFirst ? "1st" : place === "second" ? "2nd" : "3rd"}: ${entry.price}`}
+            {entry.price && entry.volume && " · "}
+            {entry.volume && `Vol: ${entry.volume}`}
+          </span>
+        )}
       </div>
 
       <input
@@ -139,12 +166,15 @@ export function DayCell({
           />
           <Image
             src={imageUrl}
-            alt={`Kalshi screenshot — ${dateISO} — ${place === "first" ? "1st place" : "2nd & 3rd place"}`}
+            alt={`Kalshi screenshot — ${dateISO} — ${place} place`}
             fill
             sizes="140px"
             className="object-cover transition-transform group-hover:scale-105"
           />
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/0 text-[10px] font-medium uppercase tracking-wide text-transparent transition-colors group-hover:bg-ink/60 group-hover:text-text">
+          {/* Fixed dark overlay (not theme-linked) so "Replace" stays readable
+              over a photo in both the dark master theme and the light
+              Apple-Calendar theme used on the per-election page. */}
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-medium uppercase tracking-wide text-transparent transition-colors group-hover:bg-black/55 group-hover:text-white">
             Replace
           </span>
           {/* Delete button */}
@@ -167,8 +197,13 @@ export function DayCell({
         >
           <span className="text-lg leading-none">{isUploading ? "···" : "+"}</span>
           <span className="text-[10px] uppercase tracking-wide">
-            {isUploading ? "Uploading" : "Drop"}
+            {isUploading ? "Reading…" : "Drop"}
           </span>
+          {!isUploading && (
+            <span className="text-[8px] uppercase tracking-wide opacity-60">
+              (AI Read)
+            </span>
+          )}
         </button>
       )}
 
