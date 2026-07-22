@@ -191,7 +191,7 @@ export function MasterTable() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-md border border-line bg-panel">
+      <div className="overflow-x-auto rounded-md border border-line bg-panel shadow-lg shadow-black/5">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-center font-display text-xs uppercase tracking-widest text-text-muted">
@@ -199,8 +199,8 @@ export function MasterTable() {
               <th className="px-4 py-3">Leader (1st)</th>
               <th className="px-4 py-3">Tier / Status</th>
               <th className="px-4 py-3">Price</th>
-              <th className="px-4 py-3">Volume</th>
-              <th className="px-4 py-3">Location / Address</th>
+              <th className="px-4 py-3 hidden md:table-cell">Volume</th>
+              <th className="px-4 py-3 hidden md:table-cell">Location / Address</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
@@ -232,7 +232,7 @@ export function MasterTable() {
                   </span>
                   {e.name}
                 </td>
-                <td className="px-4 py-3 text-center text-gold">{e.leader || "—"}</td>
+                <td className="px-4 py-3 text-center text-gold">{e.leader || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
@@ -244,9 +244,9 @@ export function MasterTable() {
                     {e.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center font-mono">{e.price || "—"}</td>
-                <td className="px-4 py-3 text-center font-mono">{e.volume || "—"}</td>
-                <td className="px-4 py-3 text-center">{e.location || "—"}</td>
+                <td className="px-4 py-3 text-center font-mono">{e.price || <span className="text-text-muted/30">—</span>}</td>
+                <td className="px-4 py-3 text-center font-mono hidden md:table-cell">{e.volume || <span className="text-text-muted/30">—</span>}</td>
+                <td className="px-4 py-3 text-center hidden md:table-cell">{e.location || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center gap-2">
                     <Link
