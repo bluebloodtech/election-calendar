@@ -232,9 +232,9 @@ export function MasterTable() {
                       disabled={deletingId === e.id}
                       onClick={() => handleDelete(e.id, e.name)}
                       title="Delete this election"
-                      className="focus-ring rounded border border-line px-2 py-1 text-xs text-text-muted hover:border-red-800 hover:text-red-400 disabled:opacity-50"
+                      className="focus-ring rounded border border-line px-3 py-1 font-display text-xs uppercase tracking-wide text-text-muted hover:border-red-800 hover:text-red-400 disabled:opacity-50"
                     >
-                      {deletingId === e.id ? "…" : "×"}
+                      {deletingId === e.id ? "Deleting…" : "Delete"}
                     </button>
                   </div>
                 </td>
