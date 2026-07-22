@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient, ARCHIVE_BUCKET, ELECTIONS_TABLE } from "@/lib/supabase-server";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
 
+const ELECTION_COLUMNS = "id, name, leader, price, volume, status, location, created_at";
+
 // GET /api/elections — all tracked election markets, oldest first.
 // Manual only, by design: the client wants Add/Delete to be the only way
 // markets enter this table — no auto-import from any external source.
@@ -9,7 +11,7 @@ export async function GET() {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from(ELECTIONS_TABLE)
-    .select("id, name, leader, price, volume, status, created_at")
+    .select(ELECTION_COLUMNS)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -22,6 +24,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const location = typeof body?.location === "string" ? body.location.trim() : "";
 
   if (!name) {
     return NextResponse.json({ error: "Missing 'name'." }, { status: 400 });
@@ -48,8 +51,8 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from(ELECTIONS_TABLE)
-    .insert({ name })
-    .select("id, name, leader, price, volume, status, created_at")
+    .insert({ name, location })
+    .select(ELECTION_COLUMNS)
     .single();
 
   if (error) {

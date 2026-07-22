@@ -19,6 +19,7 @@ export interface Election {
   price: string;
   volume: string;
   status: ElectionStatus;
+  location: string;
   created_at: string;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
 
@@ -23,8 +23,12 @@ export function MasterTable() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newLocation, setNewLocation] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const dropInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount pattern
@@ -52,19 +56,20 @@ export function MasterTable() {
       const res = await fetch("/api/elections", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, location: newLocation.trim() }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to add election.");
       setElections((prev) => [...prev, json.election]);
       setNewName("");
+      setNewLocation("");
       setShowAddForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add election.");
     } finally {
       setAdding(false);
     }
-  }, [newName]);
+  }, [newName, newLocation]);
 
   const handleDelete = useCallback(async (id: string, name: string) => {
     if (!window.confirm(`Delete "${name}"? This also removes its calendar screenshots.`)) {
@@ -85,6 +90,26 @@ export function MasterTable() {
       setError(err instanceof Error ? err.message : "Failed to delete election.");
     } finally {
       setDeletingId(null);
+    }
+  }, []);
+
+  // Command Center's own drop zone: reads a whole new market (name + leader
+  // + price + volume) off one screenshot via AI vision, instead of typing
+  // the name and filling in the calendar separately.
+  const handleIngestScreenshot = useCallback(async (file: File) => {
+    setIngesting(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/elections/from-screenshot", { method: "POST", body });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to ingest screenshot.");
+      setElections((prev) => [...prev, json.election]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to ingest screenshot.");
+    } finally {
+      setIngesting(false);
     }
   }, []);
 
@@ -119,7 +144,7 @@ export function MasterTable() {
 
       {showAddForm && (
         <form
-          className="mb-4 flex gap-2"
+          className="mb-4 flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             handleAdd();
@@ -130,7 +155,13 @@ export function MasterTable() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Market name, e.g. US Senate Race - AZ"
-            className="focus-ring flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
+            className="focus-ring min-w-[220px] flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
+          />
+          <input
+            value={newLocation}
+            onChange={(e) => setNewLocation(e.target.value)}
+            placeholder="Location / address (optional)"
+            className="focus-ring min-w-[180px] flex-1 rounded border border-line bg-panel px-3 py-2 text-sm text-text placeholder:text-text-muted"
           />
           <button
             type="submit"
@@ -166,23 +197,24 @@ export function MasterTable() {
             <tr className="border-b border-line text-center font-display text-xs uppercase tracking-widest text-text-muted">
               <th className="px-4 py-3">Market Name</th>
               <th className="px-4 py-3">Leader (1st)</th>
+              <th className="px-4 py-3">Tier / Status</th>
               <th className="px-4 py-3">Price</th>
               <th className="px-4 py-3">Volume</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Action</th>
+              <th className="px-4 py-3">Location / Address</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-text-muted">
+                <td colSpan={7} className="px-4 py-6 text-center text-text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-text-muted">
+                <td colSpan={7} className="px-4 py-6 text-center text-text-muted">
                   {elections.length === 0
                     ? "No elections yet — add your first market above."
                     : "No markets match your search."}
@@ -201,8 +233,6 @@ export function MasterTable() {
                   {e.name}
                 </td>
                 <td className="px-4 py-3 text-center text-gold">{e.leader || "—"}</td>
-                <td className="px-4 py-3 text-center font-mono">{e.price || "—"}</td>
-                <td className="px-4 py-3 text-center font-mono">{e.volume || "—"}</td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
@@ -214,6 +244,9 @@ export function MasterTable() {
                     {e.status}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-center font-mono">{e.price || "—"}</td>
+                <td className="px-4 py-3 text-center font-mono">{e.volume || "—"}</td>
+                <td className="px-4 py-3 text-center">{e.location || "—"}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center gap-2">
                     <Link
@@ -249,6 +282,50 @@ export function MasterTable() {
             ))}
           </tbody>
         </table>
+
+        {/* Command Center-level ingest: drop a market-overview screenshot
+            here to auto-create a new row via AI vision, instead of typing
+            the name and filling in the calendar separately. */}
+        <div
+          className={`m-3 flex flex-col items-center justify-center gap-1 rounded border border-dashed px-4 py-4 text-center transition-colors ${
+            isDragging
+              ? "border-gold bg-panel-raised"
+              : "border-line-bright text-text-muted hover:border-gold-dim hover:text-text"
+          } ${atCap ? "pointer-events-none opacity-40" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) handleIngestScreenshot(file);
+          }}
+        >
+          <input
+            ref={dropInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleIngestScreenshot(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => dropInputRef.current?.click()}
+            disabled={ingesting || atCap}
+            className="focus-ring text-xs uppercase tracking-wide"
+          >
+            {ingesting
+              ? "Reading screenshot…"
+              : "Drag & Drop Screenshot Here to Auto-Populate & Ingest Data via AI Vision"}
+          </button>
+        </div>
       </div>
     </div>
   );

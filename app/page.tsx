@@ -1,3 +1,4 @@
+import { TopTabs } from "@/components/TopTabs";
 import { MasterTable } from "@/components/MasterTable";
 
 export default function Home() {
@@ -10,6 +11,9 @@ export default function Home() {
         <p className="mt-1 text-sm text-text-muted">
           Master command center — every tracked market at a glance.
         </p>
+      </div>
+      <div className="w-full max-w-5xl">
+        <TopTabs />
       </div>
       <MasterTable />
     </main>
