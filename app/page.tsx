@@ -1,10 +1,14 @@
 import { TopTabs } from "@/components/TopTabs";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { MasterTable } from "@/components/MasterTable";
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center px-4 py-10 sm:px-8">
-      <div className="mb-8 w-full max-w-5xl">
+    <main id="calendar-main" className="flex min-h-screen flex-col items-center px-4 py-10 sm:px-8">
+      <div className="mb-8 w-full max-w-5xl relative">
+        <div className="absolute right-0 top-0">
+          <ThemeToggle />
+        </div>
         <p className="font-display text-xs uppercase tracking-[0.3em] text-gold">
           Election Nightclub
         </p>
