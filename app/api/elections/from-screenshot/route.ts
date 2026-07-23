@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       price: overview.price,
       volume: overview.volume,
     })
-    .select("id, name, leader, price, volume, status, location, created_at")
+    .select("id, name, leader, price, volume, status, location, election_date, image_url, created_at")
     .single();
 
   if (error) {

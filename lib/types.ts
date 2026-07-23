@@ -20,7 +20,11 @@ export interface Election {
   volume: string;
   status: ElectionStatus;
   location: string;
+  election_date: string | null; // "YYYY-MM-DD" — the row auto-deletes once this passes
+  image_url: string;
   created_at: string;
+  /** Most recent day's standings across all three placements, if any were ever read. */
+  standings?: { first: string; second: string; third: string };
 }
 
 /** Hard cap from the client spec — never track more than 15 markets. */

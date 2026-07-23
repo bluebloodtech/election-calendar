@@ -34,6 +34,7 @@ app/
   api/archive-days/delete/route.ts  DELETE a screenshot
 components/
   TopTabs.tsx                     Master Table / Calendar / Map tab bar
+  ThemeToggle.tsx                 Dark/light switch (toggles "apple-calendar" on <body>, persisted in localStorage)
   MasterTable.tsx                 The command-center table + add-election form + ingest drop zone
   CalendarGrid.tsx                 Month grid, navigation, data loading
   DayCell.tsx                      One day's drop zone / thumbnail / delete button
@@ -45,7 +46,8 @@ lib/
 supabase/
   setup.sql                        Original single-election schema (kept for history)
   migration-elections.sql          Adds multi-election support
-  migration-location.sql           Adds the Location/Address column — run this too
+  migration-location.sql           Adds the Location/Address column
+  migration-expiry.sql             Adds election_date + image_url — run this too
 ```
 
 Nothing talks to Supabase from the browser. Every read/write goes through a Next.js API route using the service role key, so Row Level Security can stay locked down with no public policies.
@@ -53,7 +55,7 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 ## Setting it up from scratch
 
 1. `npm install`
-2. Create a Supabase project, then in its SQL Editor run `supabase/migration-elections.sql` (it creates `elections`, adds the `election_id`/`leader`/`price`/`volume` columns to `archive_entries`, and migrates any pre-existing single-election data), then `supabase/migration-location.sql` (adds the `location` column to `elections`).
+2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`, adds the `election_id`/`leader`/`price`/`volume` columns to `archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`).
 3. In Supabase → Storage, create a **public** bucket named `kalshi-screenshots`.
 4. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from Project Settings → API.
@@ -69,10 +71,19 @@ Both use Claude (`claude-haiku-4-5`, the cheapest vision-capable model) via `lib
 
 ## Theming
 
-Colors are CSS custom properties defined once in `app/globals.css` (`--ink`, `--panel`, `--gold`, etc.), consumed via Tailwind's `@theme inline` mapping. The Master Command Center uses the app's default dark/gold theme. The per-election calendar page wraps its content in an `.apple-calendar` class (also in `globals.css`) that overrides those same variables to a light theme — that's the whole mechanism, no component-level theme logic.
+Colors are CSS custom properties defined once in `app/globals.css` (`--ink`, `--panel`, `--gold`, etc.), consumed via Tailwind's `@theme inline` mapping. `.apple-calendar` (also in `globals.css`) overrides those variables to a light theme. `ThemeToggle.tsx` toggles that class on `<body>` and remembers the choice in `localStorage` — no component-level theme logic needed anywhere else.
+
+## Election end date, image, and auto-expiry
+
+Two optional fields on Add: **Election Date** and **Candidate image URL**. Neither is required, and both only show up as a hover card (image + end date on the Delete button, image + runner-up names on the market name) — they don't add columns, keeping rows clean per the client's request.
+
+**Auto-expiry**: once `election_date` passes, the row (and its archived screenshots) is deleted automatically. There's no cron job — `GET /api/elections` does a lazy sweep on every load (`sweepExpiredElections` in `app/api/elections/route.ts`) and deletes anything expired before returning the list. Simple, no scheduler infra, matches "any developer can do it."
+
+**Runner-up names** (hover over the market name) come from the most recent day's `archive_entries` rows for the 2nd/3rd place tabs — the same AI Read already used per day, not a new extraction. There's no separate "top 3 in one shot" feature; dropping a screenshot on each of the 1st/2nd/3rd tabs in the calendar is what populates this.
 
 ## Known simplifications (by design, not oversights)
 
 - No authentication — anyone with the URL can add elections or upload screenshots. Add auth later if this needs to be public-facing.
-- No manual edit form for leader/price/volume — they're set by the AI read or stay blank.
+- No manual edit form for leader/price/volume — they're set by the AI read or stay blank. (Location, election date, and image URL *are* editable, but only at creation — no edit-after-the-fact UI for any field yet.)
 - The 15-election cap and the AI Read model choice are hardcoded in `lib/types.ts` and `lib/extract-screenshot.ts` respectively — change the constant, no config system to learn.
+- Yes/No prices and trading volume are intentionally never extracted by AI Read — out of scope per an explicit agreement with the client to keep this to general market data, not financial/betting data.

@@ -15,7 +15,7 @@ export default async function ElectionCalendarPage({
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from(ELECTIONS_TABLE)
-    .select("id, name, leader, price, volume, status, location, created_at")
+    .select("id, name, leader, price, volume, status, location, election_date, image_url, created_at")
     .eq("id", id)
     .single();
 
