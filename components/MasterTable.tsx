@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { HoverCard } from "@/components/HoverCard";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
 
 // Main marketing site's Election Intelligence Map (Ghost theme, routes.yaml
@@ -251,41 +252,54 @@ export function MasterTable() {
                 <td className="px-4 py-3 text-text">
                   {/* Hover card: candidate image + runner-up names, so the
                       row itself stays a single clean line ("keep the rows
-                      clean" per the client) instead of adding columns. */}
-                  <div className="group/name relative inline-block">
-                    <span className="mr-2 font-mono text-xs text-text-muted">
-                      {i + 1}.
-                    </span>
-                    {e.name}
-                    {(e.image_url || e.standings) && (
-                      <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-56 rounded border border-line bg-panel p-3 text-left text-xs normal-case tracking-normal text-text shadow-lg group-hover/name:block">
-                        {e.image_url && (
-                          // eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card
-                          <img
-                            src={e.image_url}
-                            alt={e.name}
-                            className="mb-2 h-20 w-full rounded object-cover"
-                          />
-                        )}
-                        {e.standings && (e.standings.second || e.standings.third) ? (
-                          <ul className="space-y-0.5 text-text-muted">
-                            {e.standings.second && (
-                              <li>
-                                <span className="text-steel">2nd:</span> {e.standings.second}
-                              </li>
-                            )}
-                            {e.standings.third && (
-                              <li>
-                                <span className="text-steel">3rd:</span> {e.standings.third}
-                              </li>
-                            )}
-                          </ul>
-                        ) : (
-                          !e.image_url && <p className="text-text-muted">No runner-up data yet.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                      clean" per the client) instead of adding columns.
+                      HoverCard uses position:fixed (real viewport coords),
+                      not absolute-inside-the-table, so it can never trigger
+                      the table's scrollbar and squeeze the columns. */}
+                  {e.image_url || e.standings ? (
+                    <HoverCard
+                      trigger={
+                        <>
+                          <span className="mr-2 font-mono text-xs text-text-muted">
+                            {i + 1}.
+                          </span>
+                          {e.name}
+                        </>
+                      }
+                    >
+                      {e.image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card
+                        <img
+                          src={e.image_url}
+                          alt={e.name}
+                          className="mb-2 h-20 w-full rounded object-cover"
+                        />
+                      )}
+                      {e.standings && (e.standings.second || e.standings.third) ? (
+                        <ul className="space-y-0.5 text-text-muted">
+                          {e.standings.second && (
+                            <li>
+                              <span className="text-steel">2nd:</span> {e.standings.second}
+                            </li>
+                          )}
+                          {e.standings.third && (
+                            <li>
+                              <span className="text-steel">3rd:</span> {e.standings.third}
+                            </li>
+                          )}
+                        </ul>
+                      ) : (
+                        !e.image_url && <p className="text-text-muted">No runner-up data yet.</p>
+                      )}
+                    </HoverCard>
+                  ) : (
+                    <>
+                      <span className="mr-2 font-mono text-xs text-text-muted">
+                        {i + 1}.
+                      </span>
+                      {e.name}
+                    </>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center text-gold">{e.leader || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center">
@@ -324,8 +338,36 @@ export function MasterTable() {
                     </a>
                     {/* Hover card: election end date + candidate image,
                         so you know what you're about to delete before
-                        clicking. */}
-                    <div className="group/del relative inline-block">
+                        clicking. Same fixed-position HoverCard as above. */}
+                    {e.image_url || e.election_date ? (
+                      <HoverCard
+                        trigger={
+                          <button
+                            type="button"
+                            disabled={deletingId === e.id}
+                            onClick={() => handleDelete(e.id, e.name)}
+                            title="Delete this election"
+                            className="focus-ring rounded border border-line px-3 py-1 font-display text-xs uppercase tracking-wide text-text-muted hover:border-red-800 hover:text-red-400 disabled:opacity-50"
+                          >
+                            {deletingId === e.id ? "Deleting…" : "Delete"}
+                          </button>
+                        }
+                      >
+                        {e.image_url && (
+                          // eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card
+                          <img
+                            src={e.image_url}
+                            alt={e.name}
+                            className="mb-2 h-16 w-full rounded object-cover"
+                          />
+                        )}
+                        {e.election_date && (
+                          <p className="text-text-muted">
+                            Ends: <span className="text-text">{e.election_date}</span>
+                          </p>
+                        )}
+                      </HoverCard>
+                    ) : (
                       <button
                         type="button"
                         disabled={deletingId === e.id}
@@ -335,24 +377,7 @@ export function MasterTable() {
                       >
                         {deletingId === e.id ? "Deleting…" : "Delete"}
                       </button>
-                      {(e.image_url || e.election_date) && (
-                        <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-48 rounded border border-line bg-panel p-3 text-left text-xs normal-case tracking-normal text-text shadow-lg group-hover/del:block">
-                          {e.image_url && (
-                            // eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card
-                            <img
-                              src={e.image_url}
-                              alt={e.name}
-                              className="mb-2 h-16 w-full rounded object-cover"
-                            />
-                          )}
-                          {e.election_date && (
-                            <p className="text-text-muted">
-                              Ends: <span className="text-text">{e.election_date}</span>
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </td>
               </tr>
