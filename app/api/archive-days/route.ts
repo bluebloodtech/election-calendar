@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient, ARCHIVE_TABLE } from "@/lib/supabase-server";
+import { isIsoMonth, isUuid } from "@/lib/validate";
 import type { ArchiveEntry } from "@/lib/types";
 
 // GET /api/archive-days?election=<uuid>&month=2026-07
@@ -8,15 +9,15 @@ export async function GET(req: NextRequest) {
   const month = req.nextUrl.searchParams.get("month"); // "YYYY-MM"
   const election = req.nextUrl.searchParams.get("election");
 
-  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+  if (!isIsoMonth(month)) {
     return NextResponse.json(
       { error: "Query param 'month' is required in YYYY-MM format." },
       { status: 400 }
     );
   }
-  if (!election) {
+  if (!isUuid(election)) {
     return NextResponse.json(
-      { error: "Query param 'election' is required." },
+      { error: "Query param 'election' is required (uuid)." },
       { status: 400 }
     );
   }
@@ -36,7 +37,8 @@ export async function GET(req: NextRequest) {
     .order("day", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[archive-days] GET:", error.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
 
   return NextResponse.json({ entries: data as ArchiveEntry[] });

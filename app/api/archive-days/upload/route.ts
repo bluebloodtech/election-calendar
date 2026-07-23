@@ -6,6 +6,7 @@ import {
   ELECTIONS_TABLE,
 } from "@/lib/supabase-server";
 import { extractStanding } from "@/lib/extract-screenshot";
+import { cleanString, isIsoDate, isUuid } from "@/lib/validate";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg"];
 const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel Hobby caps request bodies at 4.5MB
@@ -14,7 +15,15 @@ const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel Hobby caps request bodies a
 // FormData: file (PNG/JPG), election (uuid), day ("YYYY-MM-DD"),
 //           place ("first" | "second" | "third")
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
+  // Malformed multipart bodies throw — catch them into a clean 400 instead
+  // of an unhandled 500.
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+  }
+
   const file = form.get("file");
   const day = form.get("day");
   const place = form.get("place");
@@ -23,10 +32,13 @@ export async function POST(req: NextRequest) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing file." }, { status: 400 });
   }
-  if (typeof election !== "string" || !election) {
-    return NextResponse.json({ error: "Missing 'election'." }, { status: 400 });
+  // The election ID becomes a Storage path prefix below, so it must be
+  // format-validated BEFORE anything is written — not just left for the
+  // DB insert to reject afterwards.
+  if (!isUuid(election)) {
+    return NextResponse.json({ error: "Missing or invalid 'election'." }, { status: 400 });
   }
-  if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+  if (!isIsoDate(day)) {
     return NextResponse.json(
       { error: "Missing or invalid 'day' (expected YYYY-MM-DD)." },
       { status: 400 }
@@ -49,6 +61,24 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = getSupabaseServerClient();
+
+  // Confirm the election actually exists before touching Storage — a
+  // well-formed-but-unknown UUID would otherwise upload the image, then
+  // fail the DB insert on the FK and leave an orphaned file behind.
+  const { data: electionRow, error: electionError } = await supabase
+    .from(ELECTIONS_TABLE)
+    .select("id")
+    .eq("id", election)
+    .maybeSingle();
+
+  if (electionError) {
+    console.error("[upload] election lookup:", electionError.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
+  }
+  if (!electionRow) {
+    return NextResponse.json({ error: "Election not found." }, { status: 404 });
+  }
+
   const ext = file.type === "image/png" ? "png" : "jpg";
   const path = `${election}/${day}/${place}-${Date.now()}.${ext}`;
 
@@ -58,7 +88,8 @@ export async function POST(req: NextRequest) {
     .upload(path, arrayBuffer, { contentType: file.type, upsert: false });
 
   if (uploadError) {
-    return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    console.error("[upload] storage upload:", uploadError.message);
+    return NextResponse.json({ error: "Upload failed — please try again." }, { status: 500 });
   }
 
   const { data: publicUrlData } = supabase.storage
@@ -66,12 +97,16 @@ export async function POST(req: NextRequest) {
     .getPublicUrl(path);
 
   // AI read — best-effort; empty fields when no API key or unreadable image.
+  // Model output is untrusted input like anything else: clamp lengths.
   const base64 = Buffer.from(arrayBuffer).toString("base64");
   const extracted = await extractStanding(
     base64,
     file.type as "image/png" | "image/jpeg",
     place
   );
+  const leader = cleanString(extracted?.leader, 120);
+  const price = cleanString(extracted?.price, 40);
+  const volume = cleanString(extracted?.volume, 40);
 
   const { error: dbError } = await supabase.from(ARCHIVE_TABLE).upsert(
     {
@@ -79,26 +114,23 @@ export async function POST(req: NextRequest) {
       day,
       place,
       image_url: publicUrlData.publicUrl,
-      leader: extracted?.leader ?? "",
-      price: extracted?.price ?? "",
-      volume: extracted?.volume ?? "",
+      leader,
+      price,
+      volume,
     },
     { onConflict: "election_id,day,place" }
   );
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    console.error("[upload] archive upsert:", dbError.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
 
   // A 1st-place read also refreshes the master table's leader/price/volume.
-  if (place === "first" && extracted && (extracted.leader || extracted.price)) {
+  if (place === "first" && (leader || price)) {
     await supabase
       .from(ELECTIONS_TABLE)
-      .update({
-        leader: extracted.leader,
-        price: extracted.price,
-        volume: extracted.volume,
-      })
+      .update({ leader, price, volume })
       .eq("id", election);
   }
 
@@ -106,8 +138,8 @@ export async function POST(req: NextRequest) {
     day,
     place,
     image_url: publicUrlData.publicUrl,
-    leader: extracted?.leader ?? "",
-    price: extracted?.price ?? "",
-    volume: extracted?.volume ?? "",
+    leader,
+    price,
+    volume,
   });
 }

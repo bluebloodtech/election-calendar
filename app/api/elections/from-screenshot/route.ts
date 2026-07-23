@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient, ELECTIONS_TABLE } from "@/lib/supabase-server";
 import { extractMarketOverview } from "@/lib/extract-screenshot";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
+import { cleanString } from "@/lib/validate";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg"];
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -13,7 +14,14 @@ const MAX_BYTES = 4 * 1024 * 1024;
 // step. Requires ANTHROPIC_API_KEY — there's no non-AI fallback for this
 // one, since the whole point is not typing the name in by hand.
 export async function POST(req: NextRequest) {
-  const form = await req.formData();
+  // Malformed multipart bodies throw — catch them into a clean 400 instead
+  // of an unhandled 500.
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+  }
   const file = form.get("file");
 
   if (!(file instanceof File)) {
@@ -38,7 +46,8 @@ export async function POST(req: NextRequest) {
     .from(ELECTIONS_TABLE)
     .select("id", { count: "exact", head: true });
   if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 500 });
+    console.error("[from-screenshot] count:", countError.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
   if ((count ?? 0) >= MAX_ELECTIONS) {
     return NextResponse.json(
@@ -58,19 +67,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Model output is still untrusted input — clamp it to the same limits
+  // the manual Add form enforces.
   const { data, error } = await supabase
     .from(ELECTIONS_TABLE)
     .insert({
-      name: overview.name,
-      leader: overview.leader,
-      price: overview.price,
-      volume: overview.volume,
+      name: cleanString(overview.name, 120),
+      leader: cleanString(overview.leader, 120),
+      price: cleanString(overview.price, 40),
+      volume: cleanString(overview.volume, 40),
     })
     .select("id, name, leader, price, volume, status, location, election_date, image_url, created_at")
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[from-screenshot] insert:", error.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
   return NextResponse.json({ election: data as Election });
 }

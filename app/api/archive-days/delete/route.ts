@@ -4,6 +4,7 @@ import {
   ARCHIVE_BUCKET,
   ARCHIVE_TABLE,
 } from "@/lib/supabase-server";
+import { isIsoDate, isUuid } from "@/lib/validate";
 
 // DELETE /api/archive-days/delete
 // JSON body: { election: uuid, day: "YYYY-MM-DD", place: "first" | "second" | "third" }
@@ -11,10 +12,12 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const { election, day, place } = body ?? {};
 
-  if (typeof election !== "string" || !election) {
-    return NextResponse.json({ error: "Missing 'election'." }, { status: 400 });
+  // election/day both become a Storage path prefix below — validate the
+  // format strictly, not just presence.
+  if (!isUuid(election)) {
+    return NextResponse.json({ error: "Missing or invalid 'election'." }, { status: 400 });
   }
-  if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+  if (!isIsoDate(day)) {
     return NextResponse.json(
       { error: "Missing or invalid 'day' (expected YYYY-MM-DD)." },
       { status: 400 }
@@ -36,7 +39,8 @@ export async function DELETE(req: NextRequest) {
     .list(folder);
 
   if (listError) {
-    return NextResponse.json({ error: listError.message }, { status: 500 });
+    console.error("[archive-days/delete] storage list:", listError.message);
+    return NextResponse.json({ error: "Storage error — please try again." }, { status: 500 });
   }
 
   const toRemove = (files ?? [])
@@ -49,7 +53,8 @@ export async function DELETE(req: NextRequest) {
       .remove(toRemove);
 
     if (removeError) {
-      return NextResponse.json({ error: removeError.message }, { status: 500 });
+      console.error("[archive-days/delete] storage remove:", removeError.message);
+      return NextResponse.json({ error: "Storage error — please try again." }, { status: 500 });
     }
   }
 
@@ -61,7 +66,8 @@ export async function DELETE(req: NextRequest) {
     .eq("place", place);
 
   if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 });
+    console.error("[archive-days/delete] db delete:", dbError.message);
+    return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

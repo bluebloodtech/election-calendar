@@ -81,6 +81,20 @@ Two optional fields on Add: **Election Date** and **Candidate image URL**. Neith
 
 **Runner-up names** (hover over the market name) come from the most recent day's `archive_entries` rows for the 2nd/3rd place tabs — the same AI Read already used per day, not a new extraction. There's no separate "top 3 in one shot" feature; dropping a screenshot on each of the 1st/2nd/3rd tabs in the calendar is what populates this.
 
+## Security posture
+
+What's in place:
+- All queries go through the supabase-js query builder (parameterized — no raw SQL anywhere), server-side only, with RLS left enabled and no public policies.
+- Every client-supplied ID/date/month is format-validated at the door (`lib/validate.ts`): UUIDs, real calendar dates, http(s)-only image URLs, length caps. Invalid input gets a clean 400 instead of reaching Postgres or a Storage path.
+- Uploads verify the election exists *before* writing to Storage, so bad requests can't leave orphaned files; the election ID that becomes the Storage path prefix is guaranteed to be a plain UUID.
+- Raw database/storage error messages are logged server-side only; clients get generic messages (no schema/constraint leakage).
+- AI-read output is treated as untrusted input too — length-clamped before it's stored.
+- No secrets ship to the browser: no `NEXT_PUBLIC_` vars at all; the service-role key and the optional Anthropic key are read server-side only. React's default escaping covers XSS (no `dangerouslySetInnerHTML` anywhere).
+
+What's deliberately **not** in place (product decisions, not oversights — see below):
+- **No authentication.** Anyone with the URL can add/delete elections and upload screenshots. CSRF tokens would be meaningless without a session to protect. If this ever needs to be public-facing, auth is the first thing to add.
+- **No rate limiting.** Relevant mostly to the AI endpoints once `ANTHROPIC_API_KEY` is set — an abuser could run up (small) API costs. Vercel's platform limits are the only backstop.
+
 ## Known simplifications (by design, not oversights)
 
 - No authentication — anyone with the URL can add elections or upload screenshots. Add auth later if this needs to be public-facing.

@@ -6,10 +6,19 @@ import {
   ELECTIONS_TABLE,
 } from "@/lib/supabase-server";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
+import { cleanString, isHttpUrl, isIsoDate, isUuid } from "@/lib/validate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const ELECTION_COLUMNS =
   "id, name, leader, price, volume, status, location, election_date, image_url, created_at";
+
+// Supabase/Postgres error details are logged server-side only — the raw
+// messages can reveal schema/constraint names, which is more than a browser
+// ever needs to know.
+function dbError(context: string, error: { message: string }) {
+  console.error(`[elections] ${context}:`, error.message);
+  return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
+}
 
 // Removes every screenshot filed under <election-id>/... in Storage.
 // archive_entries rows themselves cascade-delete via the FK, but Storage
@@ -97,7 +106,7 @@ export async function GET() {
     .order("created_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return dbError("GET list", error);
   }
 
   const elections = await attachStandings(supabase, data as Election[]);
@@ -107,16 +116,28 @@ export async function GET() {
 // POST /api/elections — add a new market. Hard cap of 15 per the client spec.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const location = typeof body?.location === "string" ? body.location.trim() : "";
-  const electionDate = typeof body?.election_date === "string" && body.election_date ? body.election_date : null;
-  const imageUrl = typeof body?.image_url === "string" ? body.image_url.trim() : "";
+  const name = cleanString(body?.name, 120);
+  const location = cleanString(body?.location, 120);
+  const imageUrl = cleanString(body?.image_url, 500);
+  const rawDate = typeof body?.election_date === "string" ? body.election_date : "";
 
   if (!name) {
     return NextResponse.json({ error: "Missing 'name'." }, { status: 400 });
   }
-  if (name.length > 120) {
-    return NextResponse.json({ error: "Name is too long (max 120 chars)." }, { status: 400 });
+  // Optional fields still get validated when present — a bad date would
+  // otherwise blow up as a Postgres cast error, and a non-http image URL
+  // (javascript:, data:, file:) has no business in an <img src>.
+  if (rawDate && !isIsoDate(rawDate)) {
+    return NextResponse.json(
+      { error: "Invalid 'election_date' (expected YYYY-MM-DD)." },
+      { status: 400 }
+    );
+  }
+  if (imageUrl && !isHttpUrl(imageUrl)) {
+    return NextResponse.json(
+      { error: "Invalid 'image_url' (must be an http(s) URL)." },
+      { status: 400 }
+    );
   }
 
   const supabase = getSupabaseServerClient();
@@ -126,7 +147,7 @@ export async function POST(req: NextRequest) {
     .select("id", { count: "exact", head: true });
 
   if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 500 });
+    return dbError("POST count", countError);
   }
   if ((count ?? 0) >= MAX_ELECTIONS) {
     return NextResponse.json(
@@ -137,12 +158,12 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase
     .from(ELECTIONS_TABLE)
-    .insert({ name, location, election_date: electionDate, image_url: imageUrl })
+    .insert({ name, location, election_date: rawDate || null, image_url: imageUrl })
     .select(ELECTION_COLUMNS)
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return dbError("POST insert", error);
   }
   return NextResponse.json({ election: data as Election });
 }
@@ -152,10 +173,13 @@ export async function POST(req: NextRequest) {
 // Removes the election row plus every screenshot filed under it in Storage.
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  const id = typeof body?.id === "string" ? body.id : "";
+  const id = body?.id;
 
-  if (!id) {
-    return NextResponse.json({ error: "Missing 'id'." }, { status: 400 });
+  // UUID check does double duty: turns a Postgres cast error into a clean
+  // 400, and guarantees the Storage path prefix below is a plain UUID
+  // rather than an arbitrary client-controlled string.
+  if (!isUuid(id)) {
+    return NextResponse.json({ error: "Missing or invalid 'id'." }, { status: 400 });
   }
 
   const supabase = getSupabaseServerClient();
@@ -163,7 +187,7 @@ export async function DELETE(req: NextRequest) {
 
   const { error } = await supabase.from(ELECTIONS_TABLE).delete().eq("id", id);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return dbError("DELETE", error);
   }
   return NextResponse.json({ success: true });
 }
