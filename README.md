@@ -48,6 +48,8 @@ supabase/
   migration-elections.sql          Adds multi-election support
   migration-location.sql           Adds the Location/Address column
   migration-expiry.sql             Adds election_date + image_url — run this too
+r-integration/
+  test-data-flow.R                 Proves the Supabase data lands cleanly in R — see r-integration/README.md
 ```
 
 Nothing talks to Supabase from the browser. Every read/write goes through a Next.js API route using the service role key, so Row Level Security can stay locked down with no public policies.
@@ -94,6 +96,10 @@ What's in place:
 What's deliberately **not** in place (product decisions, not oversights — see below):
 - **No authentication.** Anyone with the URL can add/delete elections and upload screenshots. CSRF tokens would be meaningless without a session to protect. If this ever needs to be public-facing, auth is the first thing to add.
 - **No rate limiting.** Relevant mostly to the AI endpoints once `ANTHROPIC_API_KEY` is set — an abuser could run up (small) API costs. Vercel's platform limits are the only backstop.
+
+## R integration — data plumbing only
+
+This app's job stops at delivering clean, well-typed data. `r-integration/test-data-flow.R` proves that data lands correctly in R: it connects to Supabase, pulls `elections` and `archive_entries`, and prints their structure — real dates as `Date`, timestamps as `POSIXct`. It does **not** analyze, chart, or compute anything. Any statistics, comparisons, or algorithms are a separate, later phase that this codebase intentionally has no part of. See `r-integration/README.md` for how to run it.
 
 ## Known simplifications (by design, not oversights)
 
