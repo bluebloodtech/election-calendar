@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   description: "Daily election market screenshot archive",
 };
 
+// Wraps every page — loads the three fonts once here and sets the base
+// dark background/text color. Individual pages don't need to repeat any
+// of this.
 export default function RootLayout({
   children,
 }: Readonly<{
