@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 /**
- * Server-only. Reads a Kalshi screenshot with Claude vision.
+ * Server-only. Reads a Kalshi screenshot with Google Gemini vision.
  *
- * Both exports return null (instead of throwing) when ANTHROPIC_API_KEY is
+ * Both exports return null (instead of throwing) when GEMINI_API_KEY is
  * not configured or the model can't read the image — uploads must keep
  * working either way; the AI read is an enhancement, not a gate.
  */
@@ -24,9 +22,10 @@ const PLACE_LABEL: Record<string, string> = {
   third: "3rd place",
 };
 
-// Haiku: cheapest vision-capable model — this is simple text/number reading
-// off a screenshot, and the client is explicitly cost-sensitive.
-const MODEL = "claude-haiku-4-5";
+// Flash: cheapest vision-capable Gemini tier — this is simple text/number
+// reading off a screenshot, and the client is explicitly cost-sensitive.
+const MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 async function readImage<T>(
   imageBase64: string,
@@ -34,29 +33,34 @@ async function readImage<T>(
   prompt: string,
   schema: Record<string, unknown>
 ): Promise<T | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
 
   try {
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 256,
-      output_config: { format: { type: "json_schema", schema } },
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-            { type: "text", text: prompt },
-          ],
+    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inline_data: { mime_type: mediaType, data: imageBase64 } },
+              { text: prompt },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
         },
-      ],
+      }),
     });
 
-    if (response.stop_reason === "refusal") return null;
-    const block = response.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") return null;
-    return JSON.parse(block.text) as T;
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+    return JSON.parse(text) as T;
   } catch {
     return null;
   }
@@ -80,7 +84,6 @@ export async function extractStanding(
         volume: { type: "string", description: 'Volume as shown, e.g. "$1.2M" or "$45K", or empty string' },
       },
       required: ["leader", "price", "volume"],
-      additionalProperties: false,
     }
   );
   if (!parsed) return null;
@@ -114,7 +117,6 @@ export async function extractMarketOverview(
         volume: { type: "string", description: 'Volume as shown, e.g. "$1.2M" or "$45K", or empty string' },
       },
       required: ["name", "leader", "price", "volume"],
-      additionalProperties: false,
     }
   );
   if (!parsed) return null;

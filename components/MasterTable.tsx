@@ -31,6 +31,7 @@ export function MasterTable() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [ingesting, setIngesting] = useState(false);
+  const [mapPick, setMapPick] = useState("");
   const dropInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -206,6 +207,46 @@ export function MasterTable() {
         <span className="font-mono text-sm text-text-muted">
           Active Markets: {activeCount} / {MAX_ELECTIONS}
         </span>
+      </div>
+
+      {/* Pick a market -> jump straight to its pin on the Map, auto-selected
+          via the same ?candidate= param "View Map" uses per row. The
+          dropdown's options come from `elections` (already in state from
+          the fetch above) — no extra Supabase call needed. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 rounded border border-line bg-panel px-3 py-2">
+        <label htmlFor="map-pick" className="font-display text-xs uppercase tracking-wide text-text-muted">
+          Open on Map:
+        </label>
+        <select
+          id="map-pick"
+          value={mapPick}
+          onChange={(e) => setMapPick(e.target.value)}
+          disabled={elections.length === 0}
+          className="focus-ring min-w-[200px] flex-1 rounded border border-line bg-panel-raised px-3 py-1.5 text-sm text-text disabled:opacity-50"
+        >
+          <option value="">Select a candidate…</option>
+          {elections.map((e) => (
+            <option key={e.id} value={e.name}>
+              {e.name}
+            </option>
+          ))}
+        </select>
+        <a
+          href={mapPick ? mapUrlFor(mapPick) : undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={!mapPick}
+          onClick={(e) => {
+            if (!mapPick) e.preventDefault();
+          }}
+          className={`focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide ${
+            mapPick
+              ? "bg-steel text-ink hover:opacity-90"
+              : "cursor-not-allowed bg-line/40 text-text-muted"
+          }`}
+        >
+          Go to Map
+        </a>
       </div>
 
       {error && (

@@ -19,7 +19,7 @@ No custom backend framework, no message queue, no auth system — just Next.js A
 | Next.js 16 (App Router) | Pages + API routes, all in one deploy |
 | Supabase (Postgres + Storage) | `elections` and `archive_entries` tables, `kalshi-screenshots` storage bucket |
 | Tailwind CSS v4 | Styling, via CSS custom properties (see Theming below) |
-| Anthropic API (optional) | Reads price/leader/volume off an uploaded screenshot automatically |
+| Google Gemini API (optional) | Reads price/leader/volume off an uploaded screenshot automatically |
 
 ## Project layout
 
@@ -61,15 +61,17 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 3. In Supabase → Storage, create a **public** bucket named `kalshi-screenshots`.
 4. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from Project Settings → API.
-   - `ANTHROPIC_API_KEY` — **optional**. Only needed for the AI Read feature described below.
+   - `GEMINI_API_KEY` — **optional**. Only needed for the AI Read feature described below.
 5. `npm run dev`
 
 ## The AI Read features (optional, cost money, off by default)
 
-Both use Claude (`claude-haiku-4-5`, the cheapest vision-capable model) via `lib/extract-screenshot.ts`, and both need `ANTHROPIC_API_KEY` set.
+Both use Google Gemini (`gemini-2.5-flash`, the cheapest vision-capable tier) via `lib/extract-screenshot.ts`, and both need `GEMINI_API_KEY` set — get one free at [Google AI Studio](https://aistudio.google.com/apikey).
 
 1. **Per-day calendar drop** ("+ DROP (AI Read)" on each day cell) — reads the leader/price/volume for that day's screenshot. Graceful without a key: the upload still works, those three fields just stay blank until typed in manually.
 2. **Command Center drop zone** ("Drag & Drop Screenshot Here...") — reads a market's name *and* leader/price/volume off one overview screenshot to create a whole new row. **Not graceful without a key** — there's no non-AI way to guess a market's name from an image, so this specific feature returns an error telling you to use "+ Add New Election" instead. Everything else in the app is unaffected either way.
+
+Both call the Gemini REST API directly with `fetch` (no SDK dependency) — `generateContent` with an inline base64 image plus `responseSchema` for structured JSON output, so the response never needs fragile text parsing.
 
 ## Theming
 
@@ -95,7 +97,7 @@ What's in place:
 
 What's deliberately **not** in place (product decisions, not oversights — see below):
 - **No authentication.** Anyone with the URL can add/delete elections and upload screenshots. CSRF tokens would be meaningless without a session to protect. If this ever needs to be public-facing, auth is the first thing to add.
-- **No rate limiting.** Relevant mostly to the AI endpoints once `ANTHROPIC_API_KEY` is set — an abuser could run up (small) API costs. Vercel's platform limits are the only backstop.
+- **No rate limiting.** Relevant mostly to the AI endpoints once `GEMINI_API_KEY` is set — an abuser could run up (small) API costs. Vercel's platform limits are the only backstop.
 
 ## R integration — data plumbing only
 

@@ -11,7 +11,7 @@ const MAX_BYTES = 4 * 1024 * 1024;
 // FormData: file (PNG/JPG)
 // The Master Command Center's own drop zone: reads a market overview
 // screenshot with AI vision and creates a new election row from it in one
-// step. Requires ANTHROPIC_API_KEY — there's no non-AI fallback for this
+// step. Requires GEMINI_API_KEY — there's no non-AI fallback for this
 // one, since the whole point is not typing the name in by hand.
 export async function POST(req: NextRequest) {
   // Malformed multipart bodies throw — catch them into a clean 400 instead
@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ error: "File exceeds 4MB limit." }, { status: 400 });
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json(
-      { error: "AI Vision isn't configured (missing ANTHROPIC_API_KEY) — use '+ Add New Election' instead." },
+      { error: "AI Vision isn't configured (missing GEMINI_API_KEY) — use '+ Add New Election' instead." },
       { status: 501 }
     );
   }
