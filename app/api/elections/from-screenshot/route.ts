@@ -9,12 +9,10 @@ const MAX_BYTES = 4 * 1024 * 1024;
 
 // POST /api/elections/from-screenshot
 // FormData: file (PNG/JPG)
-// The Master Command Center's own drop zone: reads only the market's
-// title off a screenshot with AI vision and creates a new row from it —
-// no leader/price/volume is read or stored, by design (see
-// lib/extract-screenshot.ts). Requires GEMINI_API_KEY — there's no
-// non-AI fallback for this one, since the whole point is not typing the
-// name in by hand.
+// The Master Command Center's own drop zone: reads the market's title off
+// a screenshot with AI vision and creates a new row from it. Requires
+// GEMINI_API_KEY — there's no non-AI fallback for this one, since the
+// whole point is not typing the name in by hand.
 export async function POST(req: NextRequest) {
   // Malformed multipart bodies throw — catch them into a clean 400 instead
   // of an unhandled 500.

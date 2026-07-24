@@ -58,7 +58,7 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 ## Setting it up from scratch
 
 1. `npm install`
-2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`/`archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`), `supabase/migration-remove-betting-data.sql` (drops `leader`/`price`/`volume` — this app never reads or stores betting-market data, by design).
+2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`/`archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`), `supabase/migration-remove-betting-data.sql` (drops the `leader`/`price`/`volume` columns).
 3. In Supabase → Storage, create a **public** bucket for screenshots (name must match `ARCHIVE_BUCKET` in `lib/supabase-server.ts`).
 4. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from Project Settings → API.
@@ -67,12 +67,12 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 
 ## The AI Read feature (optional, costs money, off by default)
 
-By design, this app never reads or stores any data derived from a betting/prediction market — no candidate rankings, no prices, no odds, no trading volume. The only thing AI vision ever reads is a plain page/market **title** (e.g. "US Senate Race - AZ"), because that's just a heading, not betting-derived data.
+AI vision reads only a plain page/market **title** (e.g. "US Senate Race - AZ") off a screenshot.
 
 Uses Google Gemini (`gemini-2.5-flash`, the cheapest vision-capable tier) via `lib/extract-screenshot.ts`, and needs `GEMINI_API_KEY` set — get one free at [Google AI Studio](https://aistudio.google.com/apikey).
 
 - **Command Center drop zone** ("Drag & Drop Screenshot Here...") — reads a market's title off one screenshot to create a new row with just that name. **Not graceful without a key** — there's no non-AI way to guess a market's name from an image, so this specific feature returns an error telling you to use "+ Add New Election" instead.
-- **Per-day calendar drop** — pure archival, no AI call at all. The screenshot is stored as an image under whichever of the three manual 1st/2nd/3rd categories it was dropped into; nothing is read out of it.
+- **Per-day calendar drop** — pure archival, no AI call at all. The screenshot is stored as an image under whichever of the three manual 1st/2nd/3rd categories it was dropped into.
 
 The Gemini call goes straight to the REST API with `fetch` (no SDK dependency) — `generateContent` with an inline base64 image plus `responseSchema` for structured JSON output, so the response never needs fragile text parsing.
 
@@ -109,4 +109,3 @@ This app's job stops at delivering clean, well-typed data. `r-integration/test-d
 - No authentication — anyone with the URL can add elections or upload screenshots. Add auth later if this needs to be public-facing.
 - No edit-after-the-fact UI for any field — location, election date, and image URL are only set at creation.
 - The 15-election cap and the AI Read model choice are hardcoded in `lib/types.ts` and `lib/extract-screenshot.ts` respectively — change the constant, no config system to learn.
-- No betting/prediction-market data (odds, prices, wagered volume, candidate rankings) is ever extracted, stored, or displayed — a firm, explicit product constraint, not an oversight. See `lib/extract-screenshot.ts` and `lib/types.ts`.

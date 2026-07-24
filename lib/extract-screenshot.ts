@@ -1,13 +1,6 @@
 /**
  * Server-only. Reads a screenshot with Google Gemini vision to pull out a
- * market's title/name only — nothing else.
- *
- * By design, this app never extracts or stores any data derived from a
- * betting/prediction market: no candidate rankings, no prices, no odds,
- * no trading volume. A market's title (e.g. "US Senate Race - AZ") is
- * just a page heading, not betting-derived, so reading it is fine; who's
- * "winning" and what anything costs is not read at all. See README.md
- * for the full list of what was intentionally removed.
+ * market's title/name only.
  *
  * Returns null (instead of throwing) when GEMINI_API_KEY is not
  * configured or the model can't read the image — uploads must keep
@@ -24,10 +17,9 @@ const MODEL = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 /**
- * Master Command Center drop zone: reads only the market's title off a
+ * Master Command Center drop zone: reads the market's title off a
  * screenshot, so dropping one there can create a new row without typing
- * the name by hand. Does not read (and never has read, in this version)
- * any leader, price, or volume information.
+ * the name by hand.
  */
 export async function extractMarketName(
   imageBase64: string,
@@ -46,7 +38,7 @@ export async function extractMarketName(
             parts: [
               { inline_data: { mime_type: mediaType, data: imageBase64 } },
               {
-                text: "Read only the title/heading of this page or market — do not read any ranking, standing, price, or volume information. Return an empty string if no title is visible.",
+                text: "Read only the title/heading of this page or market. Return an empty string if no title is visible.",
               },
             ],
           },

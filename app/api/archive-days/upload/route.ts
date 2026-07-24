@@ -14,11 +14,8 @@ const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel Hobby caps request bodies a
 // FormData: file (PNG/JPG), election (uuid), day ("YYYY-MM-DD"),
 //           place ("first" | "second" | "third")
 //
-// Pure archival — no AI, no data extraction. The uploaded screenshot is
-// stored as an image and nothing else; "place" is just which of the
-// three manual filing categories it's stored under. By design, this app
-// never reads or stores any candidate ranking, price, or volume data
-// from a screenshot — see lib/extract-screenshot.ts and README.md.
+// Pure archival — the uploaded screenshot is stored as an image; "place"
+// is just which of the three manual filing categories it's stored under.
 export async function POST(req: NextRequest) {
   let form: FormData;
   try {
