@@ -4,6 +4,8 @@ import { isUuid } from "@/lib/validate";
 
 // POST /api/elections/add-to-map
 // JSON body: { id: uuid }
+// (redeploy trigger — forcing a fresh build so Vercel re-injects the
+// MAP_WORKER_URL / MAP_ADD_ADMIN_KEY environment variables)
 //
 // Takes a market already tracked in the Command Center and adds it as a
 // candidate on the separate Election Intelligence Map (Ghost site, backed
