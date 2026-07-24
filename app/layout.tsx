@@ -21,7 +21,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Archive — Election Nightclub",
-  description: "Daily Kalshi screenshot archive",
+  description: "Daily election market screenshot archive",
 };
 
 export default function RootLayout({

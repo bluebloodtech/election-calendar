@@ -59,7 +59,7 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 
 1. `npm install`
 2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`/`archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`), `supabase/migration-remove-betting-data.sql` (drops the `leader`/`price`/`volume` columns).
-3. In Supabase → Storage, create a **public** bucket for screenshots (name must match `ARCHIVE_BUCKET` in `lib/supabase-server.ts`).
+3. In Supabase → Storage, create a **public** bucket named `archive-screenshots` (name must match `ARCHIVE_BUCKET` in `lib/supabase-server.ts`).
 4. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from Project Settings → API.
    - `GEMINI_API_KEY` — **optional**. Only needed for the AI Read feature described below.
