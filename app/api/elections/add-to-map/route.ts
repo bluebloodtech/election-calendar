@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   let workerRes: Response;
   try {
-    workerRes = await fetch(`${workerUrl}/add-candidate`, {
+    workerRes = await fetch(`${workerUrl}/api/add-candidate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
