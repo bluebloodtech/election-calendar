@@ -38,6 +38,8 @@ export function MasterTable() {
   const [isDragging, setIsDragging] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [mapPick, setMapPick] = useState("");
+  const [addingToMap, setAddingToMap] = useState(false);
+  const [addToMapMsg, setAddToMapMsg] = useState<string | null>(null);
   const dropInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -128,6 +130,31 @@ export function MasterTable() {
       setIngesting(false);
     }
   }, []);
+
+  // "Add to Map": pushes the picked election onto the separate Election
+  // Intelligence Map (Ghost/Zoho), via our own server route so the map's
+  // admin key never reaches the browser. One-way — nothing comes back
+  // from the map into this app.
+  const handleAddToMap = useCallback(async () => {
+    const election = elections.find((e) => e.name === mapPick);
+    if (!election) return;
+    setAddingToMap(true);
+    setAddToMapMsg(null);
+    try {
+      const res = await fetch("/api/elections/add-to-map", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: election.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to add to map.");
+      setAddToMapMsg(`Added "${election.name}" to the map.`);
+    } catch (err) {
+      setAddToMapMsg(err instanceof Error ? err.message : "Failed to add to map.");
+    } finally {
+      setAddingToMap(false);
+    }
+  }, [elections, mapPick]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -249,6 +276,17 @@ export function MasterTable() {
         >
           Go to Map
         </a>
+        <button
+          type="button"
+          disabled={!mapPick || addingToMap}
+          onClick={handleAddToMap}
+          className="focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide bg-gold text-ink hover:opacity-90 disabled:cursor-not-allowed disabled:bg-line/40 disabled:text-text-muted disabled:opacity-100"
+        >
+          {addingToMap ? "Adding…" : "Add to Map"}
+        </button>
+        {addToMapMsg && (
+          <span className="font-mono text-xs text-text-muted">{addToMapMsg}</span>
+        )}
       </div>
 
       {error && (
