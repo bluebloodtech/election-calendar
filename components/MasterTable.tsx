@@ -40,6 +40,7 @@ export function MasterTable() {
   const [mapPick, setMapPick] = useState("");
   const [addingToMap, setAddingToMap] = useState(false);
   const [addToMapMsg, setAddToMapMsg] = useState<string | null>(null);
+  const [addToMapOk, setAddToMapOk] = useState(false);
   const dropInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -148,8 +149,10 @@ export function MasterTable() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to add to map.");
+      setAddToMapOk(true);
       setAddToMapMsg(`Added "${election.name}" to the map.`);
     } catch (err) {
+      setAddToMapOk(false);
       setAddToMapMsg(err instanceof Error ? err.message : "Failed to add to map.");
     } finally {
       setAddingToMap(false);
@@ -242,50 +245,54 @@ export function MasterTable() {
           via the same ?candidate= param "View Map" uses per row. The
           dropdown's options come from `elections` (already in state from
           the fetch above) — no extra Supabase call needed. */}
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded border border-line bg-panel px-3 py-2">
-        <label htmlFor="map-pick" className="font-display text-xs uppercase tracking-wide text-text-muted">
-          Open on Map:
-        </label>
-        <select
-          id="map-pick"
-          value={mapPick}
-          onChange={(e) => setMapPick(e.target.value)}
-          disabled={elections.length === 0}
-          className="focus-ring min-w-[200px] flex-1 rounded border border-line bg-panel-raised px-3 py-1.5 text-sm text-text disabled:opacity-50"
-        >
-          <option value="">Select a candidate…</option>
-          {elections.map((e) => (
-            <option key={e.id} value={e.name}>
-              {e.name}
-            </option>
-          ))}
-        </select>
-        <a
-          href={mapPick ? mapUrlFor(mapPick) : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-disabled={!mapPick}
-          onClick={(e) => {
-            if (!mapPick) e.preventDefault();
-          }}
-          className={`focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide ${
-            mapPick
-              ? "bg-steel text-ink hover:opacity-90"
-              : "cursor-not-allowed bg-line/40 text-text-muted"
-          }`}
-        >
-          Go to Map
-        </a>
-        <button
-          type="button"
-          disabled={!mapPick || addingToMap}
-          onClick={handleAddToMap}
-          className="focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide bg-gold text-ink hover:opacity-90 disabled:cursor-not-allowed disabled:bg-line/40 disabled:text-text-muted disabled:opacity-100"
-        >
-          {addingToMap ? "Adding…" : "Add to Map"}
-        </button>
+      <div className="mb-4 rounded border border-line bg-panel px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="map-pick" className="font-display text-xs uppercase tracking-wide text-text-muted">
+            Open on Map:
+          </label>
+          <select
+            id="map-pick"
+            value={mapPick}
+            onChange={(e) => setMapPick(e.target.value)}
+            disabled={elections.length === 0}
+            className="focus-ring min-w-[200px] flex-1 rounded border border-line bg-panel-raised px-3 py-1.5 text-sm text-text disabled:opacity-50"
+          >
+            <option value="">Select a candidate…</option>
+            {elections.map((e) => (
+              <option key={e.id} value={e.name}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+          <a
+            href={mapPick ? mapUrlFor(mapPick) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!mapPick}
+            onClick={(e) => {
+              if (!mapPick) e.preventDefault();
+            }}
+            className={`focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide ${
+              mapPick
+                ? "bg-steel text-ink hover:opacity-90"
+                : "cursor-not-allowed bg-line/40 text-text-muted"
+            }`}
+          >
+            Go to Map
+          </a>
+          <button
+            type="button"
+            disabled={!mapPick || addingToMap}
+            onClick={handleAddToMap}
+            className="focus-ring rounded px-4 py-1.5 font-display text-xs uppercase tracking-wide bg-gold text-ink hover:opacity-90 disabled:cursor-not-allowed disabled:bg-line/40 disabled:text-text-muted disabled:opacity-100"
+          >
+            {addingToMap ? "Adding…" : "Add to Map"}
+          </button>
+        </div>
         {addToMapMsg && (
-          <span className="font-mono text-xs text-text-muted">{addToMapMsg}</span>
+          <p className={`mt-2 font-mono text-xs ${addToMapOk ? "text-streak" : "text-red-400"}`}>
+            {addToMapMsg}
+          </p>
         )}
       </div>
 
