@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 
+// Switches between the dark master theme and a light "Apple Calendar"
+// style theme by toggling a CSS class on <body> (the actual color values
+// live in app/globals.css). The choice is remembered in localStorage so
+// it persists across page loads/visits.
 export function ThemeToggle() {
   const [isLight, setIsLight] = useState(false);
 

@@ -17,6 +17,12 @@ function mapUrlFor(electionName: string) {
   return `https://electionnightclub.com/map/?candidate=${encodeURIComponent(electionName)}`;
 }
 
+// The Command Center itself: loads the list of tracked elections on
+// mount, and owns every action on that list — manual add, delete, the
+// AI-vision drop zone, search/filter, and the "Open on Map" picker. This
+// is a plain deep-link out to the existing Map page (via mapUrlFor
+// above), not a data connection — it never reads or writes anything on
+// the Map/Zoho side.
 export function MasterTable() {
   const [elections, setElections] = useState<Election[]>([]);
   const [search, setSearch] = useState("");

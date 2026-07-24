@@ -8,6 +8,10 @@ const OPTIONS: { value: Place; label: string }[] = [
   { value: "third", label: "3rd Place" },
 ];
 
+// Switches which of the three manual filing categories the calendar is
+// showing. Each category has its own set of day cells/screenshots — this
+// component only changes which set CalendarGrid displays, it doesn't hold
+// any data itself.
 export function PlaceToggle({
   value,
   onChange,

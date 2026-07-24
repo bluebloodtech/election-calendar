@@ -16,6 +16,11 @@ interface DayCellProps {
   onDeleted: (dateISO: string, place: Place) => void;
 }
 
+// One square on the calendar: an empty drop zone if nothing's uploaded
+// for this day/place yet, or the uploaded screenshot with replace/delete
+// controls if something is. Upload and delete each call their own API
+// route directly, then report the result back up to CalendarGrid via
+// onUploaded/onDeleted so the shared entries map stays in sync.
 export function DayCell({
   electionId,
   dateISO,

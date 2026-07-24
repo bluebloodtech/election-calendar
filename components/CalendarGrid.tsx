@@ -11,6 +11,10 @@ function toISODate(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+// The month grid for one election. Fetches one month of archive entries
+// at a time from /api/archive-days, keeps them in memory keyed by
+// "date__place" so each DayCell can look up its own entry instantly, and
+// re-fetches whenever the visible month or 1st/2nd/3rd toggle changes.
 export function CalendarGrid({ electionId }: { electionId: string }) {
   const today = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -84,6 +88,9 @@ export function CalendarGrid({ electionId }: { electionId: string }) {
     setViewMonth(next.getMonth());
   };
 
+  // Builds the 7-wide grid: leading days from the previous month to line
+  // up the 1st under the right weekday, the current month's days, and
+  // trailing days from the next month to fill out the last row.
   const cells = useMemo(() => {
     const firstOfMonth = new Date(viewYear, viewMonth, 1);
     const startOffset = firstOfMonth.getDay(); // 0=Sun

@@ -43,6 +43,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Storage error — please try again." }, { status: 500 });
   }
 
+  // Files are named "<place>-<timestamp>.<ext>", so this only removes the
+  // one placement being deleted, not the whole day's folder.
   const toRemove = (files ?? [])
     .filter((f) => f.name.startsWith(`${place}-`))
     .map((f) => `${folder}/${f.name}`);
