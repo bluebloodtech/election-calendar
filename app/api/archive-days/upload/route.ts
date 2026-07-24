@@ -5,8 +5,7 @@ import {
   ARCHIVE_TABLE,
   ELECTIONS_TABLE,
 } from "@/lib/supabase-server";
-import { extractStanding } from "@/lib/extract-screenshot";
-import { cleanString, isIsoDate, isUuid } from "@/lib/validate";
+import { isIsoDate, isUuid } from "@/lib/validate";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg"];
 const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel Hobby caps request bodies at 4.5MB
@@ -14,9 +13,13 @@ const MAX_BYTES = 4 * 1024 * 1024; // 4MB — Vercel Hobby caps request bodies a
 // POST /api/archive-days/upload
 // FormData: file (PNG/JPG), election (uuid), day ("YYYY-MM-DD"),
 //           place ("first" | "second" | "third")
+//
+// Pure archival — no AI, no data extraction. The uploaded screenshot is
+// stored as an image and nothing else; "place" is just which of the
+// three manual filing categories it's stored under. By design, this app
+// never reads or stores any candidate ranking, price, or volume data
+// from a screenshot — see lib/extract-screenshot.ts and README.md.
 export async function POST(req: NextRequest) {
-  // Malformed multipart bodies throw — catch them into a clean 400 instead
-  // of an unhandled 500.
   let form: FormData;
   try {
     form = await req.formData();
@@ -32,9 +35,6 @@ export async function POST(req: NextRequest) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing file." }, { status: 400 });
   }
-  // The election ID becomes a Storage path prefix below, so it must be
-  // format-validated BEFORE anything is written — not just left for the
-  // DB insert to reject afterwards.
   if (!isUuid(election)) {
     return NextResponse.json({ error: "Missing or invalid 'election'." }, { status: 400 });
   }
@@ -62,9 +62,6 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseServerClient();
 
-  // Confirm the election actually exists before touching Storage — a
-  // well-formed-but-unknown UUID would otherwise upload the image, then
-  // fail the DB insert on the FK and leave an orphaned file behind.
   const { data: electionRow, error: electionError } = await supabase
     .from(ELECTIONS_TABLE)
     .select("id")
@@ -96,28 +93,8 @@ export async function POST(req: NextRequest) {
     .from(ARCHIVE_BUCKET)
     .getPublicUrl(path);
 
-  // AI read — best-effort; empty fields when no API key or unreadable image.
-  // Model output is untrusted input like anything else: clamp lengths.
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-  const extracted = await extractStanding(
-    base64,
-    file.type as "image/png" | "image/jpeg",
-    place
-  );
-  const leader = cleanString(extracted?.leader, 120);
-  const price = cleanString(extracted?.price, 40);
-  const volume = cleanString(extracted?.volume, 40);
-
   const { error: dbError } = await supabase.from(ARCHIVE_TABLE).upsert(
-    {
-      election_id: election,
-      day,
-      place,
-      image_url: publicUrlData.publicUrl,
-      leader,
-      price,
-      volume,
-    },
+    { election_id: election, day, place, image_url: publicUrlData.publicUrl },
     { onConflict: "election_id,day,place" }
   );
 
@@ -126,20 +103,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Database error — please try again." }, { status: 500 });
   }
 
-  // A 1st-place read also refreshes the master table's leader/price/volume.
-  if (place === "first" && (leader || price)) {
-    await supabase
-      .from(ELECTIONS_TABLE)
-      .update({ leader, price, volume })
-      .eq("id", election);
-  }
-
-  return NextResponse.json({
-    day,
-    place,
-    image_url: publicUrlData.publicUrl,
-    leader,
-    price,
-    volume,
-  });
+  return NextResponse.json({ day, place, image_url: publicUrlData.publicUrl });
 }

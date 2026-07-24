@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient, ELECTIONS_TABLE } from "@/lib/supabase-server";
-import { extractMarketOverview } from "@/lib/extract-screenshot";
+import { extractMarketName } from "@/lib/extract-screenshot";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
 import { cleanString } from "@/lib/validate";
 
@@ -9,10 +9,12 @@ const MAX_BYTES = 4 * 1024 * 1024;
 
 // POST /api/elections/from-screenshot
 // FormData: file (PNG/JPG)
-// The Master Command Center's own drop zone: reads a market overview
-// screenshot with AI vision and creates a new election row from it in one
-// step. Requires GEMINI_API_KEY — there's no non-AI fallback for this
-// one, since the whole point is not typing the name in by hand.
+// The Master Command Center's own drop zone: reads only the market's
+// title off a screenshot with AI vision and creates a new row from it —
+// no leader/price/volume is read or stored, by design (see
+// lib/extract-screenshot.ts). Requires GEMINI_API_KEY — there's no
+// non-AI fallback for this one, since the whole point is not typing the
+// name in by hand.
 export async function POST(req: NextRequest) {
   // Malformed multipart bodies throw — catch them into a clean 400 instead
   // of an unhandled 500.
@@ -58,26 +60,21 @@ export async function POST(req: NextRequest) {
 
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString("base64");
-  const overview = await extractMarketOverview(base64, file.type as "image/png" | "image/jpeg");
+  const result = await extractMarketName(base64, file.type as "image/png" | "image/jpeg");
 
-  if (!overview || !overview.name) {
+  if (!result || !result.name) {
     return NextResponse.json(
       { error: "Couldn't read a market name off that screenshot — try '+ Add New Election' instead." },
       { status: 422 }
     );
   }
 
-  // Model output is still untrusted input — clamp it to the same limits
+  // Model output is still untrusted input — clamp it to the same limit
   // the manual Add form enforces.
   const { data, error } = await supabase
     .from(ELECTIONS_TABLE)
-    .insert({
-      name: cleanString(overview.name, 120),
-      leader: cleanString(overview.leader, 120),
-      price: cleanString(overview.price, 40),
-      volume: cleanString(overview.volume, 40),
-    })
-    .select("id, name, leader, price, volume, status, location, election_date, image_url, created_at")
+    .insert({ name: cleanString(result.name, 120) })
+    .select("id, name, status, location, election_date, image_url, created_at")
     .single();
 
   if (error) {

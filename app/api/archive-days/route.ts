@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from(ARCHIVE_TABLE)
-    .select("day, place, image_url, created_at, leader, price, volume")
+    .select("day, place, image_url, created_at")
     .eq("election_id", election)
     .gte("day", rangeStart)
     .lte("day", rangeEnd)

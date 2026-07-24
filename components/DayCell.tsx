@@ -12,12 +12,7 @@ interface DayCellProps {
   entry?: ArchiveEntry;
   isToday: boolean;
   isCurrentMonth: boolean;
-  onUploaded: (
-    dateISO: string,
-    place: Place,
-    imageUrl: string,
-    extracted: { leader: string; price: string; volume: string }
-  ) => void;
+  onUploaded: (dateISO: string, place: Place, imageUrl: string) => void;
   onDeleted: (dateISO: string, place: Place) => void;
 }
 
@@ -64,11 +59,7 @@ export function DayCell({
         if (!res.ok) {
           throw new Error(json.error || "Upload failed.");
         }
-        onUploaded(dateISO, place, json.image_url, {
-          leader: json.leader ?? "",
-          price: json.price ?? "",
-          volume: json.volume ?? "",
-        });
+        onUploaded(dateISO, place, json.image_url);
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "Upload failed.");
       } finally {
@@ -135,13 +126,6 @@ export function DayCell({
         >
           {String(dayNumber).padStart(2, "0")}
         </span>
-        {entry && (entry.price || entry.volume) && (
-          <span className={`truncate pl-1 font-mono text-[9px] ${accentText}`}>
-            {entry.price && `${isFirst ? "1st" : place === "second" ? "2nd" : "3rd"}: ${entry.price}`}
-            {entry.price && entry.volume && " · "}
-            {entry.volume && `Vol: ${entry.volume}`}
-          </span>
-        )}
       </div>
 
       <input
@@ -166,7 +150,7 @@ export function DayCell({
           />
           <Image
             src={imageUrl}
-            alt={`Kalshi screenshot — ${dateISO} — ${place} place`}
+            alt={`Screenshot — ${dateISO} — ${place} place`}
             fill
             sizes="140px"
             className="object-cover transition-transform group-hover:scale-105"
@@ -197,13 +181,8 @@ export function DayCell({
         >
           <span className="text-lg leading-none">{isUploading ? "···" : "+"}</span>
           <span className="text-[10px] uppercase tracking-wide">
-            {isUploading ? "Reading…" : "Drop"}
+            {isUploading ? "Uploading…" : "Drop"}
           </span>
-          {!isUploading && (
-            <span className="text-[8px] uppercase tracking-wide opacity-60">
-              (AI Read)
-            </span>
-          )}
         </button>
       )}
 

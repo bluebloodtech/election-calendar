@@ -2,8 +2,8 @@
 
 A small Next.js app with three jobs:
 
-1. **Master Command Center** (`/`) — a table of every tracked election market (max 15), with search/filter, manual Add/Delete, and a drop zone that creates a new row straight from a market-overview screenshot via AI vision.
-2. **Per-election Calendar** (`/election/[id]`) — an Apple-Calendar-style monthly grid. Drop a Kalshi screenshot on any day to archive it; toggle between 1st Place and 2nd/3rd Place standings.
+1. **Master Command Center** (`/`) — a table of every tracked election market (max 15), with search/filter, manual Add/Delete, and a drop zone that creates a new row from a screenshot's title via AI vision.
+2. **Per-election Calendar** (`/election/[id]`) — an Apple-Calendar-style monthly grid. Drop a screenshot on any day to archive it as an image, filed under a 1st/2nd/3rd manual category.
 3. **Map** — reuses the existing Election Intelligence Map already built into the main Ghost site at `electionnightclub.com/map/`. This app does not host its own map; the "View Map" button links out to it with a `?candidate=<name>` param.
 
 All three are reachable from a persistent Master Table / Calendar / Map tab bar (`components/TopTabs.tsx`) shown on both pages of this app. The Map tab is a plain external link, not a client-side tab — it's a different app on a different domain.
@@ -17,9 +17,9 @@ No custom backend framework, no message queue, no auth system — just Next.js A
 | Piece | What it is |
 |---|---|
 | Next.js 16 (App Router) | Pages + API routes, all in one deploy |
-| Supabase (Postgres + Storage) | `elections` and `archive_entries` tables, `kalshi-screenshots` storage bucket |
+| Supabase (Postgres + Storage) | `elections` and `archive_entries` tables, a public storage bucket for screenshots |
 | Tailwind CSS v4 | Styling, via CSS custom properties (see Theming below) |
-| Google Gemini API (optional) | Reads price/leader/volume off an uploaded screenshot automatically |
+| Google Gemini API (optional) | Reads only a market's plain title off an uploaded screenshot |
 
 ## Project layout
 
@@ -28,9 +28,9 @@ app/
   page.tsx                        Master Command Center (home page)
   election/[id]/page.tsx          Per-election calendar page
   api/elections/route.ts          GET (list) / POST (add) / DELETE elections
-  api/elections/from-screenshot/route.ts  POST a market-overview screenshot -> new election
+  api/elections/from-screenshot/route.ts  POST a screenshot -> reads its title -> new election
   api/archive-days/route.ts       GET archive entries for one election+month
-  api/archive-days/upload/route.ts  POST a screenshot (also runs the AI read)
+  api/archive-days/upload/route.ts  POST a screenshot (pure archival, no AI)
   api/archive-days/delete/route.ts  DELETE a screenshot
 components/
   TopTabs.tsx                     Master Table / Calendar / Map tab bar
@@ -38,16 +38,17 @@ components/
   MasterTable.tsx                 The command-center table + add-election form + ingest drop zone
   CalendarGrid.tsx                 Month grid, navigation, data loading
   DayCell.tsx                      One day's drop zone / thumbnail / delete button
-  PlaceToggle.tsx                   1st / 2nd / 3rd place switch
+  PlaceToggle.tsx                   1st / 2nd / 3rd manual filing-category switch
 lib/
   types.ts                         Shared TypeScript types + the 15-election cap
   supabase-server.ts                Server-only Supabase client (service role key)
-  extract-screenshot.ts             The optional AI screenshot reader (per-day + whole-market variants)
+  extract-screenshot.ts             The optional AI screenshot title reader
 supabase/
   setup.sql                        Original single-election schema (kept for history)
   migration-elections.sql          Adds multi-election support
   migration-location.sql           Adds the Location/Address column
   migration-expiry.sql             Adds election_date + image_url — run this too
+  migration-remove-betting-data.sql Drops leader/price/volume columns — run this too
 r-integration/
   test-data-flow.R                 Proves the Supabase data lands cleanly in R — see r-integration/README.md
 ```
@@ -57,21 +58,23 @@ Nothing talks to Supabase from the browser. Every read/write goes through a Next
 ## Setting it up from scratch
 
 1. `npm install`
-2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`, adds the `election_id`/`leader`/`price`/`volume` columns to `archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`).
-3. In Supabase → Storage, create a **public** bucket named `kalshi-screenshots`.
+2. Create a Supabase project, then in its SQL Editor run, in order: `supabase/migration-elections.sql` (creates `elections`/`archive_entries`, migrates any pre-existing single-election data), `supabase/migration-location.sql` (adds `location`), `supabase/migration-expiry.sql` (adds `election_date` + `image_url`), `supabase/migration-remove-betting-data.sql` (drops `leader`/`price`/`volume` — this app never reads or stores betting-market data, by design).
+3. In Supabase → Storage, create a **public** bucket for screenshots (name must match `ARCHIVE_BUCKET` in `lib/supabase-server.ts`).
 4. Copy `.env.example` to `.env.local` and fill in:
    - `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — from Project Settings → API.
    - `GEMINI_API_KEY` — **optional**. Only needed for the AI Read feature described below.
 5. `npm run dev`
 
-## The AI Read features (optional, cost money, off by default)
+## The AI Read feature (optional, costs money, off by default)
 
-Both use Google Gemini (`gemini-2.5-flash`, the cheapest vision-capable tier) via `lib/extract-screenshot.ts`, and both need `GEMINI_API_KEY` set — get one free at [Google AI Studio](https://aistudio.google.com/apikey).
+By design, this app never reads or stores any data derived from a betting/prediction market — no candidate rankings, no prices, no odds, no trading volume. The only thing AI vision ever reads is a plain page/market **title** (e.g. "US Senate Race - AZ"), because that's just a heading, not betting-derived data.
 
-1. **Per-day calendar drop** ("+ DROP (AI Read)" on each day cell) — reads the leader/price/volume for that day's screenshot. Graceful without a key: the upload still works, those three fields just stay blank until typed in manually.
-2. **Command Center drop zone** ("Drag & Drop Screenshot Here...") — reads a market's name *and* leader/price/volume off one overview screenshot to create a whole new row. **Not graceful without a key** — there's no non-AI way to guess a market's name from an image, so this specific feature returns an error telling you to use "+ Add New Election" instead. Everything else in the app is unaffected either way.
+Uses Google Gemini (`gemini-2.5-flash`, the cheapest vision-capable tier) via `lib/extract-screenshot.ts`, and needs `GEMINI_API_KEY` set — get one free at [Google AI Studio](https://aistudio.google.com/apikey).
 
-Both call the Gemini REST API directly with `fetch` (no SDK dependency) — `generateContent` with an inline base64 image plus `responseSchema` for structured JSON output, so the response never needs fragile text parsing.
+- **Command Center drop zone** ("Drag & Drop Screenshot Here...") — reads a market's title off one screenshot to create a new row with just that name. **Not graceful without a key** — there's no non-AI way to guess a market's name from an image, so this specific feature returns an error telling you to use "+ Add New Election" instead.
+- **Per-day calendar drop** — pure archival, no AI call at all. The screenshot is stored as an image under whichever of the three manual 1st/2nd/3rd categories it was dropped into; nothing is read out of it.
+
+The Gemini call goes straight to the REST API with `fetch` (no SDK dependency) — `generateContent` with an inline base64 image plus `responseSchema` for structured JSON output, so the response never needs fragile text parsing.
 
 ## Theming
 
@@ -79,11 +82,9 @@ Colors are CSS custom properties defined once in `app/globals.css` (`--ink`, `--
 
 ## Election end date, image, and auto-expiry
 
-Two optional fields on Add: **Election Date** and **Candidate image URL**. Neither is required, and both only show up as a hover card (image + end date on the Delete button, image + runner-up names on the market name) — they don't add columns, keeping rows clean per the client's request.
+Two optional fields on Add: **Election Date** and **Candidate image URL**. Neither is required, and both only show up as a hover card (image on the market name, image + end date on the Delete button) — they don't add columns, keeping rows clean per the client's request.
 
 **Auto-expiry**: once `election_date` passes, the row (and its archived screenshots) is deleted automatically. There's no cron job — `GET /api/elections` does a lazy sweep on every load (`sweepExpiredElections` in `app/api/elections/route.ts`) and deletes anything expired before returning the list. Simple, no scheduler infra, matches "any developer can do it."
-
-**Runner-up names** (hover over the market name) come from the most recent day's `archive_entries` rows for the 2nd/3rd place tabs — the same AI Read already used per day, not a new extraction. There's no separate "top 3 in one shot" feature; dropping a screenshot on each of the 1st/2nd/3rd tabs in the calendar is what populates this.
 
 ## Security posture
 
@@ -93,7 +94,7 @@ What's in place:
 - Uploads verify the election exists *before* writing to Storage, so bad requests can't leave orphaned files; the election ID that becomes the Storage path prefix is guaranteed to be a plain UUID.
 - Raw database/storage error messages are logged server-side only; clients get generic messages (no schema/constraint leakage).
 - AI-read output is treated as untrusted input too — length-clamped before it's stored.
-- No secrets ship to the browser: no `NEXT_PUBLIC_` vars at all; the service-role key and the optional Anthropic key are read server-side only. React's default escaping covers XSS (no `dangerouslySetInnerHTML` anywhere).
+- No secrets ship to the browser: no `NEXT_PUBLIC_` vars at all; the service-role key and the optional Gemini key are read server-side only. React's default escaping covers XSS (no `dangerouslySetInnerHTML` anywhere).
 
 What's deliberately **not** in place (product decisions, not oversights — see below):
 - **No authentication.** Anyone with the URL can add/delete elections and upload screenshots. CSRF tokens would be meaningless without a session to protect. If this ever needs to be public-facing, auth is the first thing to add.
@@ -106,6 +107,6 @@ This app's job stops at delivering clean, well-typed data. `r-integration/test-d
 ## Known simplifications (by design, not oversights)
 
 - No authentication — anyone with the URL can add elections or upload screenshots. Add auth later if this needs to be public-facing.
-- No manual edit form for leader/price/volume — they're set by the AI read or stay blank. (Location, election date, and image URL *are* editable, but only at creation — no edit-after-the-fact UI for any field yet.)
+- No edit-after-the-fact UI for any field — location, election date, and image URL are only set at creation.
 - The 15-election cap and the AI Read model choice are hardcoded in `lib/types.ts` and `lib/extract-screenshot.ts` respectively — change the constant, no config system to learn.
-- Yes/No prices and trading volume are intentionally never extracted by AI Read — out of scope per an explicit agreement with the client to keep this to general market data, not financial/betting data.
+- No betting/prediction-market data (odds, prices, wagered volume, candidate rankings) is ever extracted, stored, or displayed — a firm, explicit product constraint, not an oversight. See `lib/extract-screenshot.ts` and `lib/types.ts`.

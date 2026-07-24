@@ -104,9 +104,8 @@ export function MasterTable() {
     }
   }, []);
 
-  // Command Center's own drop zone: reads a whole new market (name + leader
-  // + price + volume) off one screenshot via AI vision, instead of typing
-  // the name and filling in the calendar separately.
+  // Command Center's own drop zone: reads a market's title off one
+  // screenshot via AI vision, instead of typing the name in by hand.
   const handleIngestScreenshot = useCallback(async (file: File) => {
     setIngesting(true);
     setError(null);
@@ -127,10 +126,7 @@ export function MasterTable() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return elections;
-    return elections.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) || e.leader.toLowerCase().includes(q)
-    );
+    return elections.filter((e) => e.name.toLowerCase().includes(q));
   }, [elections, search]);
 
   const activeCount = elections.filter((e) => e.status === "Active").length;
@@ -260,10 +256,7 @@ export function MasterTable() {
           <thead>
             <tr className="border-b border-line text-center font-display text-xs uppercase tracking-widest text-text-muted">
               <th className="px-4 py-3">Market Name</th>
-              <th className="px-4 py-3">Leader (1st)</th>
               <th className="px-4 py-3">Tier / Status</th>
-              <th className="px-4 py-3">Price</th>
-              <th className="px-4 py-3 hidden md:table-cell">Volume</th>
               <th className="px-4 py-3 hidden md:table-cell">Location / Address</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -271,14 +264,14 @@ export function MasterTable() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-text-muted">
+                <td colSpan={4} className="px-4 py-6 text-center text-text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-text-muted">
+                <td colSpan={4} className="px-4 py-6 text-center text-text-muted">
                   {elections.length === 0
                     ? "No elections yet — add your first market above."
                     : "No markets match your search."}
@@ -291,13 +284,13 @@ export function MasterTable() {
                 className="border-b border-line/50 last:border-b-0 hover:bg-panel-raised"
               >
                 <td className="px-4 py-3 text-text">
-                  {/* Hover card: candidate image + runner-up names, so the
-                      row itself stays a single clean line ("keep the rows
-                      clean" per the client) instead of adding columns.
-                      HoverCard uses position:fixed (real viewport coords),
-                      not absolute-inside-the-table, so it can never trigger
+                  {/* Hover card: candidate image, so the row itself stays a
+                      single clean line ("keep the rows clean" per the
+                      client) instead of adding columns. HoverCard uses
+                      position:fixed (real viewport coords), not
+                      absolute-inside-the-table, so it can never trigger
                       the table's scrollbar and squeeze the columns. */}
-                  {e.image_url || e.standings ? (
+                  {e.image_url ? (
                     <HoverCard
                       trigger={
                         <>
@@ -308,30 +301,12 @@ export function MasterTable() {
                         </>
                       }
                     >
-                      {e.image_url && (
-                        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card
-                        <img
-                          src={e.image_url}
-                          alt={e.name}
-                          className="mb-2 h-20 w-full rounded object-cover"
-                        />
-                      )}
-                      {e.standings && (e.standings.second || e.standings.third) ? (
-                        <ul className="space-y-0.5 text-text-muted">
-                          {e.standings.second && (
-                            <li>
-                              <span className="text-steel">2nd:</span> {e.standings.second}
-                            </li>
-                          )}
-                          {e.standings.third && (
-                            <li>
-                              <span className="text-steel">3rd:</span> {e.standings.third}
-                            </li>
-                          )}
-                        </ul>
-                      ) : (
-                        !e.image_url && <p className="text-text-muted">No runner-up data yet.</p>
-                      )}
+                      {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external candidate photo URLs, not worth Next/Image domain config for a hover card */}
+                      <img
+                        src={e.image_url}
+                        alt={e.name}
+                        className="mb-2 h-20 w-full rounded object-cover"
+                      />
                     </HoverCard>
                   ) : (
                     <>
@@ -342,7 +317,6 @@ export function MasterTable() {
                     </>
                   )}
                 </td>
-                <td className="px-4 py-3 text-center text-gold">{e.leader || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
@@ -354,8 +328,6 @@ export function MasterTable() {
                     {e.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-center font-mono">{e.price || <span className="text-text-muted/30">—</span>}</td>
-                <td className="px-4 py-3 text-center font-mono hidden md:table-cell">{e.volume || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center hidden md:table-cell">{e.location || <span className="text-text-muted/30">—</span>}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center gap-2">
@@ -426,9 +398,9 @@ export function MasterTable() {
           </tbody>
         </table>
 
-        {/* Command Center-level ingest: drop a market-overview screenshot
-            here to auto-create a new row via AI vision, instead of typing
-            the name and filling in the calendar separately. */}
+        {/* Command Center-level ingest: drop a screenshot here to
+            auto-create a new row (title only) via AI vision, instead of
+            typing the name in by hand. */}
         <div
           className={`m-3 flex flex-col items-center justify-center gap-1 rounded border border-dashed px-4 py-4 text-center transition-colors ${
             isDragging
@@ -466,7 +438,7 @@ export function MasterTable() {
           >
             {ingesting
               ? "Reading screenshot…"
-              : "Drag & Drop Screenshot Here to Auto-Populate & Ingest Data via AI Vision"}
+              : "Drag & Drop Screenshot Here to Auto-Fill Market Name via AI Vision"}
           </button>
         </div>
       </div>

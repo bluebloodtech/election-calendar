@@ -53,12 +53,7 @@ export function CalendarGrid({ electionId }: { electionId: string }) {
   }, [loadMonth]);
 
   const handleUploaded = useCallback(
-    (
-      dateISO: string,
-      uploadedPlace: Place,
-      imageUrl: string,
-      extracted: { leader: string; price: string; volume: string }
-    ) => {
+    (dateISO: string, uploadedPlace: Place, imageUrl: string) => {
       setEntries((prev) => ({
         ...prev,
         [`${dateISO}__${uploadedPlace}`]: {
@@ -66,9 +61,6 @@ export function CalendarGrid({ electionId }: { electionId: string }) {
           place: uploadedPlace,
           image_url: imageUrl,
           created_at: new Date().toISOString(),
-          leader: extracted.leader,
-          price: extracted.price,
-          volume: extracted.volume,
         },
       }));
     },

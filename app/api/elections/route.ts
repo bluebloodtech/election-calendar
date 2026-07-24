@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getSupabaseServerClient,
   ARCHIVE_BUCKET,
-  ARCHIVE_TABLE,
   ELECTIONS_TABLE,
 } from "@/lib/supabase-server";
 import { MAX_ELECTIONS, type Election } from "@/lib/types";
@@ -10,7 +9,7 @@ import { cleanString, isHttpUrl, isIsoDate, isUuid } from "@/lib/validate";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const ELECTION_COLUMNS =
-  "id, name, leader, price, volume, status, location, election_date, image_url, created_at";
+  "id, name, status, location, election_date, image_url, created_at";
 
 // Supabase/Postgres error details are logged server-side only — the raw
 // messages can reveal schema/constraint names, which is more than a browser
@@ -61,37 +60,6 @@ async function sweepExpiredElections(supabase: SupabaseClient) {
     .in("id", expired.map((r) => r.id));
 }
 
-// For the Market Name hover card: the most recent day's leader name for
-// each placement, so the runner-up(s) can show on hover without adding a
-// column to the row itself ("keep the rows clean").
-async function attachStandings(supabase: SupabaseClient, elections: Election[]) {
-  if (elections.length === 0) return elections;
-  const ids = elections.map((e) => e.id);
-  const { data: entries } = await supabase
-    .from(ARCHIVE_TABLE)
-    .select("election_id, place, leader, day")
-    .in("election_id", ids)
-    .order("day", { ascending: false });
-
-  if (!entries) return elections;
-
-  const latestByElectionPlace = new Map<string, string>();
-  for (const row of entries) {
-    const key = `${row.election_id}__${row.place}`;
-    if (!latestByElectionPlace.has(key) && row.leader) {
-      latestByElectionPlace.set(key, row.leader);
-    }
-  }
-
-  return elections.map((e) => {
-    const first = latestByElectionPlace.get(`${e.id}__first`) || "";
-    const second = latestByElectionPlace.get(`${e.id}__second`) || "";
-    const third = latestByElectionPlace.get(`${e.id}__third`) || "";
-    if (!first && !second && !third) return e;
-    return { ...e, standings: { first, second, third } };
-  });
-}
-
 // GET /api/elections — all tracked election markets, oldest first.
 // Manual only, by design: the client wants Add/Delete to be the only way
 // markets enter this table — no auto-import from any external source.
@@ -109,8 +77,7 @@ export async function GET() {
     return dbError("GET list", error);
   }
 
-  const elections = await attachStandings(supabase, data as Election[]);
-  return NextResponse.json({ elections });
+  return NextResponse.json({ elections: data as Election[] });
 }
 
 // POST /api/elections — add a new market. Hard cap of 15 per the client spec.

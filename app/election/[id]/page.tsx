@@ -15,7 +15,7 @@ export default async function ElectionCalendarPage({
   const supabase = getSupabaseServerClient();
   const { data } = await supabase
     .from(ELECTIONS_TABLE)
-    .select("id, name, leader, price, volume, status, location, election_date, image_url, created_at")
+    .select("id, name, status, location, election_date, image_url, created_at")
     .eq("id", id)
     .single();
 
@@ -36,7 +36,7 @@ export default async function ElectionCalendarPage({
           {election.name}
         </h1>
         <p className="mt-1 text-sm text-text-muted">
-          Drop a Kalshi screenshot on any day — the AI reads the standing and files it.
+          Drop a screenshot on any day to archive it.
         </p>
         <div className="mt-4">
           <TopTabs electionId={election.id} electionName={election.name} />
