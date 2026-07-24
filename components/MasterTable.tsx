@@ -335,7 +335,7 @@ export function MasterTable() {
                       href={`/election/${e.id}`}
                       className="focus-ring rounded border border-line px-3 py-1 font-display text-xs uppercase tracking-wide text-text-muted hover:border-gold-dim hover:text-gold"
                     >
-                      View Cal
+                      View Calendar
                     </Link>
                     {/* The Election Intelligence Map already lives on the
                         main Ghost site (electionnightclub.com/map/) — link
