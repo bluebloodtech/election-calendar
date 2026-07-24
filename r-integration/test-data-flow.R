@@ -56,7 +56,12 @@ fetch_table <- function(table, select = "*") {
   if (httr::http_error(res)) {
     stop(sprintf("Supabase request to '%s' failed: %s", table, httr::content(res, "text")))
   }
-  jsonlite::fromJSON(httr::content(res, "text", encoding = "UTF-8"))
+  parsed <- jsonlite::fromJSON(httr::content(res, "text", encoding = "UTF-8"))
+  # An empty Postgres result is JSON "[]", which jsonlite parses as an
+  # empty list(), not a 0-row dataframe -- normalize so nrow()/str() work
+  # the same way regardless of whether the table has data yet.
+  if (!is.data.frame(parsed)) parsed <- data.frame()
+  parsed
 }
 
 cat("Connecting to Supabase and pulling both tables...\n\n")
